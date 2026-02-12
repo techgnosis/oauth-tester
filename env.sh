@@ -5,7 +5,6 @@ set -euox pipefail
 docker run \
 -it \
 --rm \
--u $(id -u):$(id -g) \
 -v ~/.claude.json:/home/jamesmusselwhite/.claude.json \
 -v ~/.claude:/home/jamesmusselwhite/.claude \
 -v ~/.gitconfig:/home/jamesmusselwhite/.gitconfig \
