@@ -4,4 +4,8 @@ oauth-tester
 oauth-tester.db
 oauth-tester.db-shm
 oauth-tester.db-wal
+oauth-tester-mac
+oauth-tester-mac.db
+oauth-tester-mac.db-shm
+oauth-tester-mac.db-wal
 *.pem
