@@ -163,12 +163,13 @@ function load() {
         (e.RequestHeaders ? '<div class="section"><div class="section-title">Request Headers</div><pre>' + esc(e.RequestHeaders) + '</pre></div>' : '') +
         (e.RequestBody ? '<div class="section"><div class="section-title">Request Body</div><pre>' + esc(e.RequestBody) + '</pre></div>' : '') +
         (e.ResponseHeaders ? '<div class="section"><div class="section-title">Response Headers</div><pre>' + esc(e.ResponseHeaders) + '</pre></div>' : '') +
-        (e.ResponseBody ? '<div class="section"><div class="section-title">Response Body</div><pre>' + esc(e.ResponseBody) + '</pre></div>' : '') +
+        (e.ResponseBody ? '<div class="section"><div class="section-title">Response Body</div><pre>' + esc(prettyJSON(e.ResponseBody)) + '</pre></div>' : '') +
       '</div>';
     }).join('');
   });
 }
 function esc(s) { if (!s) return ''; const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+function prettyJSON(s) { try { return JSON.stringify(JSON.parse(s), null, 2); } catch(e) { return s; } }
 function clearLogs() {
   if (!confirm('Clear all logs?')) return;
   fetch('/api/logs', { method: 'DELETE' }).then(() => load());
