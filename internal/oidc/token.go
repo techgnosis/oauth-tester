@@ -103,6 +103,7 @@ func (t *TokenHandlers) Token(w http.ResponseWriter, r *http.Request) {
 		Nonce:    ac.Nonce,
 		Email:    user.Email,
 		Name:     user.Name,
+		Groups:   []string{},
 	}
 
 	idToken, err := t.Keys.SignIDToken(claims)

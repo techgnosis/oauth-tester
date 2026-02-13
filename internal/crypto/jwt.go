@@ -13,14 +13,15 @@ import (
 
 // Claims represents the JWT claims for an ID token.
 type Claims struct {
-	Issuer   string `json:"iss"`
-	Subject  string `json:"sub"`
-	Audience string `json:"aud"`
-	Exp      int64  `json:"exp"`
-	Iat      int64  `json:"iat"`
-	Nonce    string `json:"nonce,omitempty"`
-	Email    string `json:"email,omitempty"`
-	Name     string `json:"name,omitempty"`
+	Issuer   string   `json:"iss"`
+	Subject  string   `json:"sub"`
+	Audience string   `json:"aud"`
+	Exp      int64    `json:"exp"`
+	Iat      int64    `json:"iat"`
+	Nonce    string   `json:"nonce,omitempty"`
+	Email    string   `json:"email,omitempty"`
+	Name     string   `json:"name,omitempty"`
+	Groups   []string `json:"groups,omitempty"`
 }
 
 // SignIDToken creates a signed JWT ID token.
