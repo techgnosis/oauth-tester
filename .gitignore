@@ -2,3 +2,6 @@
 vendor/
 oauth-tester
 oauth-tester.db
+oauth-tester.db-shm
+oauth-tester.db-wal
+*.pem
