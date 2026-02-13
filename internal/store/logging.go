@@ -2,6 +2,9 @@ package store
 
 import (
 	"bytes"
+	"encoding/base64"
+	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"strings"
@@ -44,6 +47,11 @@ func LoggingMiddleware(s Store, next http.Handler) http.Handler {
 		reqHeaders := headerString(r.Header)
 		respHeaders := headerString(rec.Header())
 
+		responseBody := rec.body.String()
+		if r.URL.Path == "/token" && rec.statusCode == 200 {
+			responseBody = decodeJWTsInResponse(responseBody)
+		}
+
 		entry := &LogEntry{
 			Timestamp:       time.Now().UTC(),
 			Method:          r.Method,
@@ -53,11 +61,68 @@ func LoggingMiddleware(s Store, next http.Handler) http.Handler {
 			RequestBody:     string(reqBody),
 			ResponseStatus:  rec.statusCode,
 			ResponseHeaders: respHeaders,
-			ResponseBody:    rec.body.String(),
+			ResponseBody:    responseBody,
 		}
 		// Best effort logging — don't fail the request if this errors.
 		s.SaveLog(entry)
 	})
+}
+
+// decodeJWTsInResponse parses a token endpoint JSON response and replaces
+// encoded JWT strings with their decoded header+claims for readability.
+func decodeJWTsInResponse(body string) string {
+	var resp map[string]any
+	if err := json.Unmarshal([]byte(body), &resp); err != nil {
+		return body
+	}
+
+	for _, key := range []string{"access_token", "id_token"} {
+		tok, ok := resp[key].(string)
+		if !ok {
+			continue
+		}
+		decoded, err := decodeJWT(tok)
+		if err != nil {
+			continue
+		}
+		resp[key] = decoded
+	}
+
+	out, err := json.MarshalIndent(resp, "", "  ")
+	if err != nil {
+		return body
+	}
+	return string(out)
+}
+
+// decodeJWT splits a JWT into its parts and returns the decoded header and claims.
+func decodeJWT(token string) (map[string]any, error) {
+	parts := strings.Split(token, ".")
+	if len(parts) != 3 {
+		return nil, errors.New("not a JWT")
+	}
+
+	header, err := base64.RawURLEncoding.DecodeString(parts[0])
+	if err != nil {
+		return nil, err
+	}
+	claims, err := base64.RawURLEncoding.DecodeString(parts[1])
+	if err != nil {
+		return nil, err
+	}
+
+	var h, c map[string]any
+	if err := json.Unmarshal(header, &h); err != nil {
+		return nil, err
+	}
+	if err := json.Unmarshal(claims, &c); err != nil {
+		return nil, err
+	}
+
+	return map[string]any{
+		"header": h,
+		"claims": c,
+	}, nil
 }
 
 func isOIDCPath(path string) bool {
