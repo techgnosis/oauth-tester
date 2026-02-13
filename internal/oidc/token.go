@@ -97,13 +97,14 @@ func (t *TokenHandlers) Token(w http.ResponseWriter, r *http.Request) {
 
 	// Generate ID token
 	claims := &crypto.Claims{
-		Issuer:   t.Config.IssuerURL,
-		Subject:  user.Username,
-		Audience: []string{audience},
-		Nonce:    ac.Nonce,
-		Email:    user.Email,
-		Name:     user.Name,
-		Groups:   []string{},
+		Issuer:        t.Config.IssuerURL,
+		Subject:       user.Username,
+		Audience:      []string{audience},
+		Nonce:         ac.Nonce,
+		Email:         user.Email,
+		EmailVerified: true,
+		Name:          user.Name,
+		Groups:        []string{"users"},
 	}
 
 	idToken, err := t.Keys.SignIDToken(claims)

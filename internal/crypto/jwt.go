@@ -18,10 +18,11 @@ type Claims struct {
 	Audience []string `json:"aud"`
 	Exp      int64    `json:"exp"`
 	Iat      int64    `json:"iat"`
-	Nonce    string   `json:"nonce,omitempty"`
-	Email    string   `json:"email,omitempty"`
-	Name     string   `json:"name,omitempty"`
-	Groups   []string `json:"groups"`
+	Nonce         string   `json:"nonce,omitempty"`
+	Email         string   `json:"email,omitempty"`
+	EmailVerified bool     `json:"email_verified"`
+	Name          string   `json:"name,omitempty"`
+	Groups        []string `json:"groups"`
 }
 
 // SignIDToken creates a signed JWT ID token.
