@@ -84,8 +84,8 @@ func TestAuthGetRendersForm(t *testing.T) {
 	if !contains(body, "Login") {
 		t.Error("response missing Login button")
 	}
-	if !contains(body, "username") {
-		t.Error("response missing username field")
+	if !contains(body, "email") {
+		t.Error("response missing email field")
 	}
 	if !contains(body, `value="xyz"`) {
 		t.Error("response missing state hidden field")

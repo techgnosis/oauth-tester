@@ -98,7 +98,7 @@ func (t *TokenHandlers) Token(w http.ResponseWriter, r *http.Request) {
 	// Generate ID token
 	claims := &crypto.Claims{
 		Issuer:        t.Config.IssuerURL,
-		Subject:       user.Username,
+		Subject:       user.Email,
 		Audience:      []string{audience},
 		Nonce:         ac.Nonce,
 		Email:         user.Email,

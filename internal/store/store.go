@@ -22,6 +22,7 @@ type Store interface {
 type UserStore interface {
 	CreateUser(u *User) error
 	GetUser(username string) (*User, error)
+	GetUserByEmail(email string) (*User, error)
 	ListUsers() ([]User, error)
 	UpdateUser(u *User) error
 	DeleteUser(username string) error
@@ -179,6 +180,18 @@ func (s *SQLiteStore) GetUser(username string) (*User, error) {
 	err := s.db.QueryRow(
 		"SELECT id, username, password, email, name FROM users WHERE username = ?",
 		username,
+	).Scan(&u.ID, &u.Username, &u.Password, &u.Email, &u.Name)
+	if err != nil {
+		return nil, err
+	}
+	return u, nil
+}
+
+func (s *SQLiteStore) GetUserByEmail(email string) (*User, error) {
+	u := &User{}
+	err := s.db.QueryRow(
+		"SELECT id, username, password, email, name FROM users WHERE email = ?",
+		email,
 	).Scan(&u.ID, &u.Username, &u.Password, &u.Email, &u.Name)
 	if err != nil {
 		return nil, err

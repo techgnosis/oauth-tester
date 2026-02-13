@@ -44,8 +44,8 @@ var loginTmpl = template.Must(template.New("login").Parse(`<!DOCTYPE html>
     <input type="hidden" name="scope" value="{{.Scope}}">
     <input type="hidden" name="state" value="{{.State}}">
     <input type="hidden" name="nonce" value="{{.Nonce}}">
-    <label for="username">Username</label>
-    <input type="text" id="username" name="username" required autofocus>
+    <label for="email">Email</label>
+    <input type="email" id="email" name="email" required autofocus>
     <label for="password">Password</label>
     <input type="password" id="password" name="password" required>
     <button type="submit">Login</button>
@@ -87,7 +87,7 @@ func (a *AuthHandlers) AuthGet(w http.ResponseWriter, r *http.Request) {
 func (a *AuthHandlers) AuthPost(w http.ResponseWriter, r *http.Request) {
 	r.ParseForm()
 
-	username := r.FormValue("username")
+	email := r.FormValue("email")
 	password := r.FormValue("password")
 	redirectURI := r.FormValue("redirect_uri")
 	state := r.FormValue("state")
@@ -106,9 +106,9 @@ func (a *AuthHandlers) AuthPost(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Validate credentials
-	user, err := a.Store.GetUser(username)
+	user, err := a.Store.GetUserByEmail(email)
 	if err != nil || user.Password != password {
-		data.Error = "Invalid username or password"
+		data.Error = "Invalid email or password"
 		w.Header().Set("Content-Type", "text/html")
 		w.WriteHeader(http.StatusUnauthorized)
 		loginTmpl.Execute(w, data)
@@ -124,7 +124,7 @@ func (a *AuthHandlers) AuthPost(w http.ResponseWriter, r *http.Request) {
 
 	err = a.Store.SaveAuthCode(&store.AuthCode{
 		Code:        code,
-		Username:    username,
+		Username:    user.Username,
 		RedirectURI: redirectURI,
 		Scope:       scope,
 		Nonce:       nonce,
