@@ -1,3 +1,3 @@
 #! /usr/bin/env bash
 
-GOOS=darwin GOARCH=arm64 go build --mod=vendor
+GOOS=darwin GOARCH=arm64 CGO_ENABLED=0 go build --mod=vendor
