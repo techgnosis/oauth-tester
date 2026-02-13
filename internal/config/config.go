@@ -11,7 +11,7 @@ type Config struct {
 	ClientID  string
 	CertFile  string // defaults to cert.pem
 	KeyFile   string // defaults to key.pem
-	DBPath    string // hardcoded to oauth-tester.db
+	DBPath    string // defaults to ./oauth-tester.db, override with DB_PATH
 	Addr      string // listen address, :443
 }
 
@@ -36,12 +36,17 @@ func Load() (*Config, error) {
 		keyFile = "key.pem"
 	}
 
+	dbPath := os.Getenv("DB_PATH")
+	if dbPath == "" {
+		dbPath = "oauth-tester.db"
+	}
+
 	return &Config{
 		IssuerURL: issuer,
 		ClientID:  clientID,
 		CertFile:  certFile,
 		KeyFile:   keyFile,
-		DBPath:    "oauth-tester.db",
+		DBPath:    dbPath,
 		Addr:      ":443",
 	}, nil
 }
