@@ -28,9 +28,9 @@ oauth-tester will have a web UI
 
 First, the web UI will provide the normal login page that the APC user expects. The same login page that all IdPs provide.
 
-Second, the web UI will provide a simple page that lets you add, delete, or edit a user. Perhaps its just a grid that lets the user edit one cell at a time and then just updates the DB every time.
+Second, the web UI will provide a simple page that lets you add, delete, or edit a user. Perhaps its just a grid that lets the user edit one cell at a time and then just updates the DB every time. Passwords are stored and displayed in plain text.
 
-The UI should have a page called "logs" where every request and response is logged. It's crucial that I can see how everything works at the HTTP level.
+The UI should have a page called "logs" where every OIDC-related request and response is logged. It's crucial that I can see how everything works at the HTTP level.
 
 
 ## oauth-tester shape
