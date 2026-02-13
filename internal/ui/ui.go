@@ -6,6 +6,8 @@ import (
 	"encoding/json"
 	"html/template"
 	"net/http"
+	"strconv"
+	"strings"
 
 	"oauth-tester/internal/store"
 )
@@ -187,9 +189,41 @@ func (p *PageHandlers) LogsPage(w http.ResponseWriter, r *http.Request) {
 	logsTmpl.Execute(w, nil)
 }
 
-// LogsAPI returns logs as JSON for the logs page.
+// ListLogs returns logs as JSON. Supports query parameters for filtering:
+//
+//	method   - HTTP method (e.g. POST)
+//	path     - request path (e.g. /token)
+//	status   - response status code (e.g. 400)
+//	limit    - max results (default 50, used by UI with 200)
+//	minutes  - only entries from the last N minutes
+//
+// When no query parameters are provided, behaves like the original endpoint
+// (returns up to 200 recent entries) for backward compatibility with the UI.
 func (a *APIHandlers) ListLogs(w http.ResponseWriter, r *http.Request) {
-	logs, err := a.Store.ListLogs(200)
+	q := r.URL.Query()
+	hasFilters := q.Has("method") || q.Has("path") || q.Has("status") || q.Has("limit") || q.Has("minutes")
+
+	var logs []store.LogEntry
+	var err error
+
+	if hasFilters {
+		lq := store.LogQuery{}
+		lq.Method = strings.ToUpper(q.Get("method"))
+		lq.Path = q.Get("path")
+		if v := q.Get("status"); v != "" {
+			lq.Status, _ = strconv.Atoi(v)
+		}
+		if v := q.Get("limit"); v != "" {
+			lq.Limit, _ = strconv.Atoi(v)
+		}
+		if v := q.Get("minutes"); v != "" {
+			lq.MinutesAgo, _ = strconv.Atoi(v)
+		}
+		logs, err = a.Store.QueryLogs(lq)
+	} else {
+		logs, err = a.Store.ListLogs(200)
+	}
+
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return

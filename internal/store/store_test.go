@@ -154,3 +154,48 @@ func TestLogs(t *testing.T) {
 		t.Errorf("after clear, log count = %d, want 0", len(logs))
 	}
 }
+
+func TestQueryLogs(t *testing.T) {
+	s := testDB(t)
+
+	now := time.Now().UTC()
+	entries := []LogEntry{
+		{Timestamp: now, Method: "GET", Path: "/.well-known/openid-configuration", ResponseStatus: 200, ResponseBody: `{"issuer":"x"}`},
+		{Timestamp: now, Method: "POST", Path: "/token", ResponseStatus: 200, ResponseBody: `{"access_token":"ok"}`},
+		{Timestamp: now, Method: "POST", Path: "/token", ResponseStatus: 400, ResponseBody: `{"error":"invalid_grant"}`},
+		{Timestamp: now, Method: "GET", Path: "/auth", ResponseStatus: 302},
+	}
+	for i := range entries {
+		if err := s.SaveLog(&entries[i]); err != nil {
+			t.Fatalf("SaveLog[%d]: %v", i, err)
+		}
+	}
+
+	tests := []struct {
+		name  string
+		query LogQuery
+		want  int
+	}{
+		{"no filters", LogQuery{}, 4},
+		{"method POST", LogQuery{Method: "POST"}, 2},
+		{"path /token", LogQuery{Path: "/token"}, 2},
+		{"status 400", LogQuery{Status: 400}, 1},
+		{"POST /token", LogQuery{Method: "POST", Path: "/token"}, 2},
+		{"POST /token status 400", LogQuery{Method: "POST", Path: "/token", Status: 400}, 1},
+		{"limit 1", LogQuery{Limit: 1}, 1},
+		{"last 5 minutes", LogQuery{MinutesAgo: 5}, 4},
+		{"no match", LogQuery{Method: "DELETE"}, 0},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			logs, err := s.QueryLogs(tt.query)
+			if err != nil {
+				t.Fatalf("QueryLogs: %v", err)
+			}
+			if len(logs) != tt.want {
+				t.Errorf("got %d logs, want %d", len(logs), tt.want)
+			}
+		})
+	}
+}

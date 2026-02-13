@@ -32,9 +32,19 @@ type AuthCodeStore interface {
 	ConsumeAuthCode(code string) (*AuthCode, error)
 }
 
+// LogQuery specifies filters for listing log entries. Zero values are ignored.
+type LogQuery struct {
+	Method     string // Filter by HTTP method (e.g. "POST")
+	Path       string // Filter by request path (e.g. "/token")
+	Status     int    // Filter by response status code (e.g. 400)
+	Limit      int    // Max results to return (default 50)
+	MinutesAgo int    // Only return entries from the last N minutes (0 = no time filter)
+}
+
 type LogStore interface {
 	SaveLog(entry *LogEntry) error
 	ListLogs(limit int) ([]LogEntry, error)
+	QueryLogs(q LogQuery) ([]LogEntry, error)
 	ClearLogs() error
 }
 
@@ -249,6 +259,55 @@ func (s *SQLiteStore) ListLogs(limit int) ([]LogEntry, error) {
 		"SELECT id, timestamp, method, path, query, request_headers, request_body, response_status, response_headers, response_body FROM request_log ORDER BY id DESC LIMIT ?",
 		limit,
 	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var logs []LogEntry
+	for rows.Next() {
+		var e LogEntry
+		if err := rows.Scan(
+			&e.ID, &e.Timestamp, &e.Method, &e.Path, &e.Query,
+			&e.RequestHeaders, &e.RequestBody,
+			&e.ResponseStatus, &e.ResponseHeaders, &e.ResponseBody,
+		); err != nil {
+			return nil, err
+		}
+		logs = append(logs, e)
+	}
+	return logs, rows.Err()
+}
+
+func (s *SQLiteStore) QueryLogs(q LogQuery) ([]LogEntry, error) {
+	query := "SELECT id, timestamp, method, path, query, request_headers, request_body, response_status, response_headers, response_body FROM request_log WHERE 1=1"
+	var args []any
+
+	if q.Method != "" {
+		query += " AND method = ?"
+		args = append(args, q.Method)
+	}
+	if q.Path != "" {
+		query += " AND path = ?"
+		args = append(args, q.Path)
+	}
+	if q.Status != 0 {
+		query += " AND response_status = ?"
+		args = append(args, q.Status)
+	}
+	if q.MinutesAgo > 0 {
+		query += " AND timestamp >= datetime('now', ?)"
+		args = append(args, fmt.Sprintf("-%d minutes", q.MinutesAgo))
+	}
+
+	limit := q.Limit
+	if limit <= 0 {
+		limit = 50
+	}
+	query += " ORDER BY id DESC LIMIT ?"
+	args = append(args, limit)
+
+	rows, err := s.db.Query(query, args...)
 	if err != nil {
 		return nil, err
 	}
