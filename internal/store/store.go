@@ -55,6 +55,7 @@ type User struct {
 	Password string
 	Email    string
 	Name     string
+	Groups   string
 }
 
 type AuthCode struct {
@@ -153,6 +154,7 @@ func (s *SQLiteStore) migrate() error {
 	alterMigrations := []string{
 		"ALTER TABLE auth_codes ADD COLUMN nonce TEXT NOT NULL DEFAULT ''",
 		"ALTER TABLE auth_codes ADD COLUMN client_id TEXT NOT NULL DEFAULT ''",
+		"ALTER TABLE users ADD COLUMN groups TEXT NOT NULL DEFAULT ''",
 	}
 	for _, m := range alterMigrations {
 		s.db.Exec(m) // ignore errors (column already exists)
@@ -165,8 +167,8 @@ func (s *SQLiteStore) migrate() error {
 
 func (s *SQLiteStore) CreateUser(u *User) error {
 	res, err := s.db.Exec(
-		"INSERT INTO users (username, password, email, name) VALUES (?, ?, ?, ?)",
-		u.Username, u.Password, u.Email, u.Name,
+		"INSERT INTO users (username, password, email, name, groups) VALUES (?, ?, ?, ?, ?)",
+		u.Username, u.Password, u.Email, u.Name, u.Groups,
 	)
 	if err != nil {
 		return err
@@ -178,9 +180,9 @@ func (s *SQLiteStore) CreateUser(u *User) error {
 func (s *SQLiteStore) GetUser(username string) (*User, error) {
 	u := &User{}
 	err := s.db.QueryRow(
-		"SELECT id, username, password, email, name FROM users WHERE username = ?",
+		"SELECT id, username, password, email, name, groups FROM users WHERE username = ?",
 		username,
-	).Scan(&u.ID, &u.Username, &u.Password, &u.Email, &u.Name)
+	).Scan(&u.ID, &u.Username, &u.Password, &u.Email, &u.Name, &u.Groups)
 	if err != nil {
 		return nil, err
 	}
@@ -190,9 +192,9 @@ func (s *SQLiteStore) GetUser(username string) (*User, error) {
 func (s *SQLiteStore) GetUserByEmail(email string) (*User, error) {
 	u := &User{}
 	err := s.db.QueryRow(
-		"SELECT id, username, password, email, name FROM users WHERE email = ?",
+		"SELECT id, username, password, email, name, groups FROM users WHERE email = ?",
 		email,
-	).Scan(&u.ID, &u.Username, &u.Password, &u.Email, &u.Name)
+	).Scan(&u.ID, &u.Username, &u.Password, &u.Email, &u.Name, &u.Groups)
 	if err != nil {
 		return nil, err
 	}
@@ -200,7 +202,7 @@ func (s *SQLiteStore) GetUserByEmail(email string) (*User, error) {
 }
 
 func (s *SQLiteStore) ListUsers() ([]User, error) {
-	rows, err := s.db.Query("SELECT id, username, password, email, name FROM users ORDER BY id")
+	rows, err := s.db.Query("SELECT id, username, password, email, name, groups FROM users ORDER BY id")
 	if err != nil {
 		return nil, err
 	}
@@ -209,7 +211,7 @@ func (s *SQLiteStore) ListUsers() ([]User, error) {
 	var users []User
 	for rows.Next() {
 		var u User
-		if err := rows.Scan(&u.ID, &u.Username, &u.Password, &u.Email, &u.Name); err != nil {
+		if err := rows.Scan(&u.ID, &u.Username, &u.Password, &u.Email, &u.Name, &u.Groups); err != nil {
 			return nil, err
 		}
 		users = append(users, u)
@@ -219,8 +221,8 @@ func (s *SQLiteStore) ListUsers() ([]User, error) {
 
 func (s *SQLiteStore) UpdateUser(u *User) error {
 	_, err := s.db.Exec(
-		"UPDATE users SET password = ?, email = ?, name = ? WHERE username = ?",
-		u.Password, u.Email, u.Name, u.Username,
+		"UPDATE users SET password = ?, email = ?, name = ?, groups = ? WHERE username = ?",
+		u.Password, u.Email, u.Name, u.Groups, u.Username,
 	)
 	return err
 }

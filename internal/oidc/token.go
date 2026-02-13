@@ -3,6 +3,7 @@ package oidc
 import (
 	"encoding/json"
 	"net/http"
+	"strings"
 	"time"
 
 	"oauth-tester/internal/crypto"
@@ -104,7 +105,7 @@ func (t *TokenHandlers) Token(w http.ResponseWriter, r *http.Request) {
 		Email:         user.Email,
 		EmailVerified: true,
 		Name:          user.Name,
-		Groups:        []string{"users"},
+		Groups:        parseGroups(user.Groups),
 	}
 
 	idToken, err := t.Keys.SignIDToken(claims)
@@ -122,6 +123,26 @@ func (t *TokenHandlers) Token(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(resp)
+}
+
+// parseGroups splits a comma-separated groups string into a slice.
+// Returns ["users"] as a default if the string is empty.
+func parseGroups(s string) []string {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return []string{"users"}
+	}
+	parts := strings.Split(s, ",")
+	groups := make([]string, 0, len(parts))
+	for _, p := range parts {
+		if g := strings.TrimSpace(p); g != "" {
+			groups = append(groups, g)
+		}
+	}
+	if len(groups) == 0 {
+		return []string{"users"}
+	}
+	return groups
 }
 
 func tokenError(w http.ResponseWriter, code, desc string) {

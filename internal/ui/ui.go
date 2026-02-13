@@ -53,7 +53,7 @@ var usersTmpl = template.Must(template.New("users").Parse(`<!DOCTYPE html>
   </div>
   <table>
     <thead>
-      <tr><th>Username</th><th>Password</th><th>Email</th><th>Name</th><th></th></tr>
+      <tr><th>Username</th><th>Password</th><th>Email</th><th>Name</th><th>Groups</th><th></th></tr>
     </thead>
     <tbody id="user-table"></tbody>
   </table>
@@ -70,6 +70,7 @@ function load() {
         '<td><input value="' + esc(u.Password) + '" onchange="upd(\'' + esc(u.Username) + '\', this.parentNode.parentNode)"></td>' +
         '<td><input value="' + esc(u.Email) + '" onchange="upd(\'' + esc(u.Username) + '\', this.parentNode.parentNode)"></td>' +
         '<td><input value="' + esc(u.Name) + '" onchange="upd(\'' + esc(u.Username) + '\', this.parentNode.parentNode)"></td>' +
+        '<td><input value="' + esc(u.Groups) + '" placeholder="users" onchange="upd(\'' + esc(u.Username) + '\', this.parentNode.parentNode)"></td>' +
         '<td><button class="btn btn-del" onclick="del(\'' + esc(u.Username) + '\')">Delete</button></td>';
       tbody.appendChild(tr);
     });
@@ -79,14 +80,14 @@ function esc(s) { const d = document.createElement('div'); d.textContent = s; re
 function addUser() {
   const name = prompt('Username:');
   if (!name) return;
-  fetch('/api/users', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({Username: name, Password: '', Email: '', Name: ''}) })
+  fetch('/api/users', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({Username: name, Password: '', Email: '', Name: '', Groups: ''}) })
     .then(() => load());
 }
 function upd(username, row) {
   const inputs = row.querySelectorAll('input');
   fetch('/api/users/' + encodeURIComponent(username), {
     method: 'PUT', headers: {'Content-Type':'application/json'},
-    body: JSON.stringify({ Password: inputs[1].value, Email: inputs[2].value, Name: inputs[3].value })
+    body: JSON.stringify({ Password: inputs[1].value, Email: inputs[2].value, Name: inputs[3].value, Groups: inputs[4].value })
   }).then(() => load());
 }
 function del(username) {
