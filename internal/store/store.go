@@ -35,6 +35,7 @@ type AuthCodeStore interface {
 type LogStore interface {
 	SaveLog(entry *LogEntry) error
 	ListLogs(limit int) ([]LogEntry, error)
+	ClearLogs() error
 }
 
 type User struct {

@@ -6,6 +6,7 @@ import (
 
 	"oauth-tester/internal/config"
 	"oauth-tester/internal/crypto"
+	"oauth-tester/internal/oidc"
 	"oauth-tester/internal/store"
 )
 
@@ -17,12 +18,17 @@ type Deps struct {
 }
 
 // New creates a configured http.ServeMux with all routes.
-func New(deps *Deps) *http.ServeMux {
+func New(deps *Deps) http.Handler {
 	mux := http.NewServeMux()
 
-	// OIDC endpoints (stubs for now, implemented in later tasks)
-	mux.HandleFunc("GET /.well-known/openid-configuration", notImplemented)
-	mux.HandleFunc("GET /jwks", notImplemented)
+	oidcHandlers := &oidc.Handlers{
+		Config: deps.Config,
+		Keys:   deps.Keys,
+	}
+
+	// OIDC endpoints
+	mux.HandleFunc("GET /.well-known/openid-configuration", oidcHandlers.Discovery)
+	mux.HandleFunc("GET /jwks", oidcHandlers.JWKS)
 	mux.HandleFunc("GET /auth", notImplemented)
 	mux.HandleFunc("POST /auth", notImplemented)
 	mux.HandleFunc("POST /token", notImplemented)
@@ -46,7 +52,8 @@ func New(deps *Deps) *http.ServeMux {
 		http.Redirect(w, r, "/ui/users", http.StatusFound)
 	})
 
-	return mux
+	// Wrap with logging middleware for OIDC paths
+	return store.LoggingMiddleware(deps.Store, mux)
 }
 
 func notImplemented(w http.ResponseWriter, r *http.Request) {
