@@ -37,6 +37,7 @@ func New(deps *Deps) http.Handler {
 	}
 	tokenHandlers.Config.IssuerURL = deps.Config.IssuerURL
 	tokenHandlers.Config.ClientID = deps.Config.ClientID
+	tokenHandlers.Config.ClientSecret = deps.Config.ClientSecret
 
 	apiHandlers := &ui.APIHandlers{
 		Store: deps.Store,

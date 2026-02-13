@@ -11,8 +11,9 @@ import (
 
 type TokenHandlers struct {
 	Config struct {
-		IssuerURL string
-		ClientID  string
+		IssuerURL    string
+		ClientID     string
+		ClientSecret string
 	}
 	Store store.Store
 	Keys  *crypto.KeyPair
@@ -55,7 +56,31 @@ func (t *TokenHandlers) Token(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_ = clientID // accepted but not strictly validated for simplicity
+	// Validate client credentials (support both client_secret_post and client_secret_basic)
+	clientSecret := r.FormValue("client_secret")
+	if basicUser, basicPass, ok := r.BasicAuth(); ok {
+		if clientID == "" {
+			clientID = basicUser
+		}
+		if clientSecret == "" {
+			clientSecret = basicPass
+		}
+	}
+	if t.Config.ClientSecret != "" {
+		if clientSecret != t.Config.ClientSecret {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusUnauthorized)
+			json.NewEncoder(w).Encode(map[string]string{
+				"error":             "invalid_client",
+				"error_description": "invalid client_secret",
+			})
+			return
+		}
+	}
+	if clientID != "" && clientID != ac.ClientID {
+		tokenError(w, "invalid_client", "client_id mismatch")
+		return
+	}
 
 	// Look up user for claims
 	user, err := t.Store.GetUser(ac.Username)

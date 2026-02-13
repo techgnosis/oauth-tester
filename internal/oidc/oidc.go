@@ -28,6 +28,7 @@ func (h *Handlers) Discovery(w http.ResponseWriter, r *http.Request) {
 		"id_token_signing_alg_values_supported": []string{"RS256"},
 		"scopes_supported":                      []string{"openid", "email", "profile"},
 		"grant_types_supported":                 []string{"authorization_code"},
+		"token_endpoint_auth_methods_supported": []string{"client_secret_post", "client_secret_basic"},
 	}
 
 	w.Header().Set("Content-Type", "application/json")

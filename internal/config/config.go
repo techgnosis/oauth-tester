@@ -7,12 +7,13 @@ import (
 )
 
 type Config struct {
-	IssuerURL string // e.g. https://oauth-tester.example.com
-	ClientID  string
-	CertFile  string // defaults to cert.pem
-	KeyFile   string // defaults to key.pem
-	DBPath    string // defaults to ./oauth-tester.db, override with DB_PATH
-	Addr      string // listen address, :443
+	IssuerURL    string // e.g. https://oauth-tester.example.com
+	ClientID     string
+	ClientSecret string // optional, validated on token endpoint if set
+	CertFile     string // defaults to cert.pem
+	KeyFile      string // defaults to key.pem
+	DBPath       string // defaults to ./oauth-tester.db, override with DB_PATH
+	Addr         string // listen address, :443
 }
 
 func Load() (*Config, error) {
@@ -42,11 +43,12 @@ func Load() (*Config, error) {
 	}
 
 	return &Config{
-		IssuerURL: issuer,
-		ClientID:  clientID,
-		CertFile:  certFile,
-		KeyFile:   keyFile,
-		DBPath:    dbPath,
-		Addr:      ":443",
+		IssuerURL:    issuer,
+		ClientID:     clientID,
+		ClientSecret: os.Getenv("CLIENT_SECRET"),
+		CertFile:     certFile,
+		KeyFile:      keyFile,
+		DBPath:       dbPath,
+		Addr:         ":443",
 	}, nil
 }

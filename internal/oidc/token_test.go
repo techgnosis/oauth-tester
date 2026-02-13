@@ -40,6 +40,7 @@ func TestTokenEndpoint(t *testing.T) {
 		Username:    "alice",
 		RedirectURI: "https://app/callback",
 		Scope:       "openid",
+		ClientID:    "testclient",
 		CreatedAt:   time.Now().UTC(),
 	})
 
@@ -102,6 +103,59 @@ func TestTokenEndpointInvalidCode(t *testing.T) {
 
 	if w.Code != 400 {
 		t.Fatalf("status = %d, want 400", w.Code)
+	}
+}
+
+func TestTokenEndpointClientSecretValidation(t *testing.T) {
+	s := testStore(t)
+	kp, _ := crypto.GenerateKeyPair()
+
+	s.CreateUser(&store.User{Username: "alice", Password: "pass", Email: "alice@test.com", Name: "Alice"})
+	s.SaveAuthCode(&store.AuthCode{
+		Code:        "secretcode",
+		Username:    "alice",
+		RedirectURI: "https://app/callback",
+		Scope:       "openid",
+		ClientID:    "testclient",
+		CreatedAt:   time.Now().UTC(),
+	})
+
+	th := &TokenHandlers{
+		Store: s,
+		Keys:  kp,
+	}
+	th.Config.IssuerURL = "https://idp.example.com"
+	th.Config.ClientID = "testclient"
+	th.Config.ClientSecret = "supersecret"
+
+	// Wrong secret should fail
+	body := "grant_type=authorization_code&code=secretcode&client_id=testclient&client_secret=wrong"
+	req := httptest.NewRequest("POST", "/token", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	w := httptest.NewRecorder()
+	th.Token(w, req)
+
+	if w.Code != 401 {
+		t.Fatalf("wrong secret: status = %d, want 401; body: %s", w.Code, w.Body.String())
+	}
+
+	// Correct secret should succeed
+	s.SaveAuthCode(&store.AuthCode{
+		Code:        "secretcode2",
+		Username:    "alice",
+		RedirectURI: "https://app/callback",
+		Scope:       "openid",
+		ClientID:    "testclient",
+		CreatedAt:   time.Now().UTC(),
+	})
+	body = "grant_type=authorization_code&code=secretcode2&client_id=testclient&client_secret=supersecret"
+	req = httptest.NewRequest("POST", "/token", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	w = httptest.NewRecorder()
+	th.Token(w, req)
+
+	if w.Code != 200 {
+		t.Fatalf("correct secret: status = %d, want 200; body: %s", w.Code, w.Body.String())
 	}
 }
 
