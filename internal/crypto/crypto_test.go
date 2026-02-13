@@ -71,7 +71,7 @@ func TestSignIDToken(t *testing.T) {
 	claims := &Claims{
 		Issuer:   "https://example.com",
 		Subject:  "testuser",
-		Audience: "client123",
+		Audience: []string{"client123"},
 		Email:    "test@example.com",
 		Name:     "Test User",
 	}

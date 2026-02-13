@@ -15,7 +15,7 @@ import (
 type Claims struct {
 	Issuer   string   `json:"iss"`
 	Subject  string   `json:"sub"`
-	Audience string   `json:"aud"`
+	Audience []string `json:"aud"`
 	Exp      int64    `json:"exp"`
 	Iat      int64    `json:"iat"`
 	Nonce    string   `json:"nonce,omitempty"`

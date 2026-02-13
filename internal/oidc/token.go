@@ -99,7 +99,7 @@ func (t *TokenHandlers) Token(w http.ResponseWriter, r *http.Request) {
 	claims := &crypto.Claims{
 		Issuer:   t.Config.IssuerURL,
 		Subject:  user.Username,
-		Audience: audience,
+		Audience: []string{audience},
 		Nonce:    ac.Nonce,
 		Email:    user.Email,
 		Name:     user.Name,
