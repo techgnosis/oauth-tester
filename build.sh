@@ -2,4 +2,4 @@
 
 set euo -pipefail
 
-docker build -t oauth-tester:1 .
+docker build -t docker.io/techgnosis/oauth-tester:1 .
