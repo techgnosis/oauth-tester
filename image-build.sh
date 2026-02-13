@@ -1,7 +1,7 @@
 #! /usr/bin/env bash
 
-set euo -pipefail
+set -euo pipefail
 
-docker build -t docker.io/techgnosis/oauth-tester:1 -f Dockerfile.app .
+docker build --platform=linux/amd64 -t docker.io/techgnosis/oauth-tester:1 -f Dockerfile.app .
 
 docker push docker.io/techgnosis/oauth-tester:1
