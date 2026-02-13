@@ -10,4 +10,4 @@ docker run \
 -v ~/.gitconfig:/home/jamesmusselwhite/.gitconfig \
 -v ~/.ssh:/home/jamesmusselwhite/.ssh:ro \
 -v .:/workspace \
-oauth-tester:1 bash
+oauth-tester-env:1 bash
