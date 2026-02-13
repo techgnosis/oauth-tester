@@ -18,6 +18,7 @@ type Claims struct {
 	Audience string `json:"aud"`
 	Exp      int64  `json:"exp"`
 	Iat      int64  `json:"iat"`
+	Nonce    string `json:"nonce,omitempty"`
 	Email    string `json:"email,omitempty"`
 	Name     string `json:"name,omitempty"`
 }

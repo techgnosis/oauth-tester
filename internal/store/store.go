@@ -51,6 +51,8 @@ type AuthCode struct {
 	Username    string
 	RedirectURI string
 	Scope       string
+	Nonce       string
+	ClientID    string
 	CreatedAt   time.Time
 }
 
@@ -124,6 +126,8 @@ func (s *SQLiteStore) migrate() error {
 			username TEXT NOT NULL,
 			redirect_uri TEXT NOT NULL DEFAULT '',
 			scope TEXT NOT NULL DEFAULT '',
+			nonce TEXT NOT NULL DEFAULT '',
+			client_id TEXT NOT NULL DEFAULT '',
 			created_at DATETIME NOT NULL DEFAULT (datetime('now'))
 		)`,
 	}
@@ -133,6 +137,16 @@ func (s *SQLiteStore) migrate() error {
 			return fmt.Errorf("exec migration: %w", err)
 		}
 	}
+
+	// Add columns if they don't exist (for existing databases).
+	alterMigrations := []string{
+		"ALTER TABLE auth_codes ADD COLUMN nonce TEXT NOT NULL DEFAULT ''",
+		"ALTER TABLE auth_codes ADD COLUMN client_id TEXT NOT NULL DEFAULT ''",
+	}
+	for _, m := range alterMigrations {
+		s.db.Exec(m) // ignore errors (column already exists)
+	}
+
 	return nil
 }
 
@@ -197,8 +211,8 @@ func (s *SQLiteStore) DeleteUser(username string) error {
 
 func (s *SQLiteStore) SaveAuthCode(code *AuthCode) error {
 	_, err := s.db.Exec(
-		"INSERT INTO auth_codes (code, username, redirect_uri, scope, created_at) VALUES (?, ?, ?, ?, ?)",
-		code.Code, code.Username, code.RedirectURI, code.Scope, code.CreatedAt,
+		"INSERT INTO auth_codes (code, username, redirect_uri, scope, nonce, client_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+		code.Code, code.Username, code.RedirectURI, code.Scope, code.Nonce, code.ClientID, code.CreatedAt,
 	)
 	return err
 }
@@ -207,9 +221,9 @@ func (s *SQLiteStore) SaveAuthCode(code *AuthCode) error {
 func (s *SQLiteStore) ConsumeAuthCode(code string) (*AuthCode, error) {
 	ac := &AuthCode{}
 	err := s.db.QueryRow(
-		"SELECT code, username, redirect_uri, scope, created_at FROM auth_codes WHERE code = ?",
+		"SELECT code, username, redirect_uri, scope, nonce, client_id, created_at FROM auth_codes WHERE code = ?",
 		code,
-	).Scan(&ac.Code, &ac.Username, &ac.RedirectURI, &ac.Scope, &ac.CreatedAt)
+	).Scan(&ac.Code, &ac.Username, &ac.RedirectURI, &ac.Scope, &ac.Nonce, &ac.ClientID, &ac.CreatedAt)
 	if err != nil {
 		return nil, err
 	}

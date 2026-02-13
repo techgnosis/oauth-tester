@@ -64,11 +64,18 @@ func (t *TokenHandlers) Token(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Use client_id from the original auth request if available, fall back to config
+	audience := ac.ClientID
+	if audience == "" {
+		audience = t.Config.ClientID
+	}
+
 	// Generate ID token
 	claims := &crypto.Claims{
 		Issuer:   t.Config.IssuerURL,
 		Subject:  user.Username,
-		Audience: t.Config.ClientID,
+		Audience: audience,
+		Nonce:    ac.Nonce,
 		Email:    user.Email,
 		Name:     user.Name,
 	}

@@ -43,6 +43,7 @@ var loginTmpl = template.Must(template.New("login").Parse(`<!DOCTYPE html>
     <input type="hidden" name="response_type" value="{{.ResponseType}}">
     <input type="hidden" name="scope" value="{{.Scope}}">
     <input type="hidden" name="state" value="{{.State}}">
+    <input type="hidden" name="nonce" value="{{.Nonce}}">
     <label for="username">Username</label>
     <input type="text" id="username" name="username" required autofocus>
     <label for="password">Password</label>
@@ -59,6 +60,7 @@ type loginData struct {
 	ResponseType string
 	Scope        string
 	State        string
+	Nonce        string
 	Error        string
 }
 
@@ -75,6 +77,7 @@ func (a *AuthHandlers) AuthGet(w http.ResponseWriter, r *http.Request) {
 		ResponseType: r.URL.Query().Get("response_type"),
 		Scope:        r.URL.Query().Get("scope"),
 		State:        r.URL.Query().Get("state"),
+		Nonce:        r.URL.Query().Get("nonce"),
 	}
 	w.Header().Set("Content-Type", "text/html")
 	loginTmpl.Execute(w, data)
@@ -90,12 +93,16 @@ func (a *AuthHandlers) AuthPost(w http.ResponseWriter, r *http.Request) {
 	state := r.FormValue("state")
 	scope := r.FormValue("scope")
 
+	clientID := r.FormValue("client_id")
+	nonce := r.FormValue("nonce")
+
 	data := loginData{
-		ClientID:     r.FormValue("client_id"),
+		ClientID:     clientID,
 		RedirectURI:  redirectURI,
 		ResponseType: r.FormValue("response_type"),
 		Scope:        scope,
 		State:        state,
+		Nonce:        nonce,
 	}
 
 	// Validate credentials
@@ -120,6 +127,8 @@ func (a *AuthHandlers) AuthPost(w http.ResponseWriter, r *http.Request) {
 		Username:    username,
 		RedirectURI: redirectURI,
 		Scope:       scope,
+		Nonce:       nonce,
+		ClientID:    clientID,
 		CreatedAt:   time.Now().UTC(),
 	})
 	if err != nil {
