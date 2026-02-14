@@ -349,7 +349,7 @@ func (a *APIHandlers) ListLogs(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		jsonError(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 	if logs == nil {
@@ -362,7 +362,7 @@ func (a *APIHandlers) ListLogs(w http.ResponseWriter, r *http.Request) {
 // ClearLogs deletes all log entries.
 func (a *APIHandlers) ClearLogs(w http.ResponseWriter, r *http.Request) {
 	if err := a.Store.ClearLogs(); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		jsonError(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)

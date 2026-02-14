@@ -109,6 +109,10 @@ func Open(dbPath string) (*SQLiteStore, error) {
 		return nil, fmt.Errorf("open database: %w", err)
 	}
 
+	// SQLite only supports one writer at a time; limit to one connection
+	// so that per-connection PRAGMAs (like foreign_keys) stay in effect.
+	db.SetMaxOpenConns(1)
+
 	// Enable WAL mode for better concurrent access.
 	if _, err := db.Exec("PRAGMA journal_mode=WAL"); err != nil {
 		db.Close()
