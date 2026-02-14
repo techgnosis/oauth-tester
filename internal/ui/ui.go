@@ -280,7 +280,7 @@ function addMember(groupName) {
   fetch('/api/groups/' + encodeURIComponent(groupName) + '/members').then(r => r.json()).then(members => {
     const nonMembers = allUsers.filter(u => !members.includes(u.Username));
     if (nonMembers.length === 0) { alert('All users are already in this group.'); return; }
-    const choice = prompt('Add user to "' + groupName + '":\\n\\n' + nonMembers.map((u, i) => (i+1) + '. ' + u.Username).join('\\n') + '\\n\\nEnter number or username:');
+    const choice = prompt('Add user to "' + groupName + '":\n\n' + nonMembers.map((u, i) => (i+1) + '. ' + u.Username).join('\n') + '\n\nEnter number or username:');
     if (!choice) return;
     const num = parseInt(choice);
     const username = (num > 0 && num <= nonMembers.length) ? nonMembers[num-1].Username : choice;
