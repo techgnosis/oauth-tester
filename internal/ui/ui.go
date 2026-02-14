@@ -116,7 +116,8 @@ var logsTmpl = template.Must(template.New("logs").Parse(`<!DOCTYPE html>
   .btn-clear { background: #d32f2f; color: #fff; }
   .btn-clear:hover { background: #b71c1c; }
   .log-entry { background: #fff; border-radius: 8px; padding: 16px; margin-bottom: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
-  .log-header { display: flex; gap: 12px; align-items: center; margin-bottom: 8px; }
+  .log-header { display: flex; gap: 12px; align-items: center; margin-bottom: 8px; min-width: 0; }
+  .log-path { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; flex: 1; }
   .method { font-weight: bold; padding: 2px 8px; border-radius: 4px; font-size: 13px; }
   .method-GET { background: #e8f5e9; color: #2e7d32; }
   .method-POST { background: #e3f2fd; color: #1565c0; }
@@ -157,7 +158,7 @@ function load() {
       return '<div class="log-entry">' +
         '<div class="log-header">' +
           '<span class="method method-' + esc(e.Method) + '">' + esc(e.Method) + '</span>' +
-          '<span>' + esc(e.Path) + (e.Query ? '?' + esc(e.Query) : '') + '</span>' +
+          '<span class="log-path" title="' + esc(e.Path) + (e.Query ? '?' + esc(e.Query) : '') + '">' + esc(e.Path) + (e.Query ? '?' + esc(e.Query) : '') + '</span>' +
           '<span class="status status-' + sc + '">' + e.ResponseStatus + '</span>' +
           '<span class="timestamp">' + esc(e.Timestamp) + '</span>' +
         '</div>' +
