@@ -31,6 +31,7 @@ func (h *Handlers) Discovery(w http.ResponseWriter, r *http.Request) {
 		"claims_supported":                      []string{"sub", "iss", "aud", "exp", "iat", "nonce", "email", "email_verified", "name", "groups"},
 		"grant_types_supported":                 []string{"authorization_code"},
 		"token_endpoint_auth_methods_supported": []string{"client_secret_post", "client_secret_basic"},
+		"code_challenge_methods_supported":      []string{"S256"},
 	}
 
 	w.Header().Set("Content-Type", "application/json")

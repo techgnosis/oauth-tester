@@ -32,16 +32,14 @@ func New(deps *Deps) http.Handler {
 	}
 
 	tokenHandlers := &oidc.TokenHandlers{
-		Store: deps.Store,
-		Keys:  deps.Keys,
+		Config: deps.Config,
+		Store:  deps.Store,
+		Keys:   deps.Keys,
 	}
 
 	userInfoHandlers := &oidc.UserInfoHandlers{
 		Keys: deps.Keys,
 	}
-	tokenHandlers.Config.IssuerURL = deps.Config.IssuerURL
-	tokenHandlers.Config.ClientID = deps.Config.ClientID
-	tokenHandlers.Config.ClientSecret = deps.Config.ClientSecret
 
 	apiHandlers := &ui.APIHandlers{
 		Store: deps.Store,
@@ -84,8 +82,4 @@ func New(deps *Deps) http.Handler {
 
 	// Wrap with logging middleware for OIDC paths
 	return store.LoggingMiddleware(deps.Store, mux)
-}
-
-func notImplemented(w http.ResponseWriter, r *http.Request) {
-	http.Error(w, "not implemented", http.StatusNotImplemented)
 }

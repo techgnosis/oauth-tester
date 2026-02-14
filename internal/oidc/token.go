@@ -6,18 +6,15 @@ import (
 	"strings"
 	"time"
 
+	"oauth-tester/internal/config"
 	"oauth-tester/internal/crypto"
 	"oauth-tester/internal/store"
 )
 
 type TokenHandlers struct {
-	Config struct {
-		IssuerURL    string
-		ClientID     string
-		ClientSecret string
-	}
-	Store store.Store
-	Keys  *crypto.KeyPair
+	Config *config.Config
+	Store  store.Store
+	Keys   *crypto.KeyPair
 }
 
 func (t *TokenHandlers) Token(w http.ResponseWriter, r *http.Request) {

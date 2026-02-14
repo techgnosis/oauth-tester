@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"html/template"
 	"net/http"
+	"net/url"
 	"time"
 
 	"oauth-tester/internal/store"
@@ -137,7 +138,7 @@ func (a *AuthHandlers) AuthPost(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Redirect back to the client
-	location := fmt.Sprintf("%s?code=%s&state=%s", redirectURI, code, state)
+	location := fmt.Sprintf("%s?code=%s&state=%s", redirectURI, url.QueryEscape(code), url.QueryEscape(state))
 	http.Redirect(w, r, location, http.StatusFound)
 }
 

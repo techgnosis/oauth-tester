@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"oauth-tester/internal/config"
 	"oauth-tester/internal/crypto"
 	"oauth-tester/internal/store"
 )
@@ -45,11 +46,10 @@ func TestTokenEndpoint(t *testing.T) {
 	})
 
 	th := &TokenHandlers{
-		Store: s,
-		Keys:  kp,
+		Config: &config.Config{IssuerURL: "https://idp.example.com", ClientID: "testclient"},
+		Store:  s,
+		Keys:   kp,
 	}
-	th.Config.IssuerURL = "https://idp.example.com"
-	th.Config.ClientID = "testclient"
 
 	body := "grant_type=authorization_code&code=validcode&redirect_uri=https://app/callback&client_id=testclient"
 	req := httptest.NewRequest("POST", "/token", strings.NewReader(body))
@@ -88,11 +88,10 @@ func TestTokenEndpointInvalidCode(t *testing.T) {
 	kp, _ := crypto.GenerateKeyPair()
 
 	th := &TokenHandlers{
-		Store: s,
-		Keys:  kp,
+		Config: &config.Config{IssuerURL: "https://idp.example.com", ClientID: "testclient"},
+		Store:  s,
+		Keys:   kp,
 	}
-	th.Config.IssuerURL = "https://idp.example.com"
-	th.Config.ClientID = "testclient"
 
 	body := "grant_type=authorization_code&code=badcode&client_id=testclient"
 	req := httptest.NewRequest("POST", "/token", strings.NewReader(body))
@@ -121,12 +120,10 @@ func TestTokenEndpointClientSecretValidation(t *testing.T) {
 	})
 
 	th := &TokenHandlers{
-		Store: s,
-		Keys:  kp,
+		Config: &config.Config{IssuerURL: "https://idp.example.com", ClientID: "testclient", ClientSecret: "supersecret"},
+		Store:  s,
+		Keys:   kp,
 	}
-	th.Config.IssuerURL = "https://idp.example.com"
-	th.Config.ClientID = "testclient"
-	th.Config.ClientSecret = "supersecret"
 
 	// Wrong secret should fail
 	body := "grant_type=authorization_code&code=secretcode&client_id=testclient&client_secret=wrong"
@@ -164,8 +161,9 @@ func TestTokenEndpointUnsupportedGrant(t *testing.T) {
 	kp, _ := crypto.GenerateKeyPair()
 
 	th := &TokenHandlers{
-		Store: s,
-		Keys:  kp,
+		Config: &config.Config{},
+		Store:  s,
+		Keys:   kp,
 	}
 
 	body := "grant_type=client_credentials"
