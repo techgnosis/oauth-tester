@@ -44,6 +44,7 @@ var usersTmpl = template.Must(template.New("users").Parse(`<!DOCTYPE html>
 <body>
 <nav>
   <a href="/ui/users" class="active">Users</a>
+  <a href="/ui/groups">Groups</a>
   <a href="/ui/logs">Logs</a>
 </nav>
 <div class="container">
@@ -53,7 +54,7 @@ var usersTmpl = template.Must(template.New("users").Parse(`<!DOCTYPE html>
   </div>
   <table>
     <thead>
-      <tr><th>Username</th><th>Password</th><th>Email</th><th>Name</th><th>Groups</th><th></th></tr>
+      <tr><th>Username</th><th>Password</th><th>Email</th><th>Name</th><th></th></tr>
     </thead>
     <tbody id="user-table"></tbody>
   </table>
@@ -70,7 +71,6 @@ function load() {
         '<td><input value="' + esc(u.Password) + '" onchange="upd(\'' + esc(u.Username) + '\', this.parentNode.parentNode)"></td>' +
         '<td><input value="' + esc(u.Email) + '" onchange="upd(\'' + esc(u.Username) + '\', this.parentNode.parentNode)"></td>' +
         '<td><input value="' + esc(u.Name) + '" onchange="upd(\'' + esc(u.Username) + '\', this.parentNode.parentNode)"></td>' +
-        '<td><input value="' + esc(u.Groups) + '" placeholder="users" onchange="upd(\'' + esc(u.Username) + '\', this.parentNode.parentNode)"></td>' +
         '<td><button class="btn btn-del" onclick="del(\'' + esc(u.Username) + '\')">Delete</button></td>';
       tbody.appendChild(tr);
     });
@@ -80,14 +80,14 @@ function esc(s) { const d = document.createElement('div'); d.textContent = s; re
 function addUser() {
   const name = prompt('Username:');
   if (!name) return;
-  fetch('/api/users', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({Username: name, Password: '', Email: '', Name: '', Groups: ''}) })
+  fetch('/api/users', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({Username: name, Password: '', Email: '', Name: ''}) })
     .then(() => load());
 }
 function upd(username, row) {
   const inputs = row.querySelectorAll('input');
   fetch('/api/users/' + encodeURIComponent(username), {
     method: 'PUT', headers: {'Content-Type':'application/json'},
-    body: JSON.stringify({ Password: inputs[1].value, Email: inputs[2].value, Name: inputs[3].value, Groups: inputs[4].value })
+    body: JSON.stringify({ Password: inputs[1].value, Email: inputs[2].value, Name: inputs[3].value })
   }).then(() => load());
 }
 function del(username) {
@@ -136,6 +136,7 @@ var logsTmpl = template.Must(template.New("logs").Parse(`<!DOCTYPE html>
 <body>
 <nav>
   <a href="/ui/users">Users</a>
+  <a href="/ui/groups">Groups</a>
   <a href="/ui/logs" class="active">Logs</a>
 </nav>
 <div class="container">
@@ -182,9 +183,129 @@ setInterval(load, 3000);
 </body>
 </html>`))
 
+var groupsTmpl = template.Must(template.New("groups").Parse(`<!DOCTYPE html>
+<html>
+<head>
+<title>Groups - oauth-tester</title>
+<style>
+  body { font-family: system-ui, sans-serif; margin: 0; padding: 0; background: #f5f5f5; }
+  nav { background: #1a1a2e; padding: 12px 24px; display: flex; gap: 16px; }
+  nav a { color: #e0e0e0; text-decoration: none; font-size: 14px; }
+  nav a:hover { color: #fff; }
+  nav a.active { color: #fff; font-weight: bold; }
+  .container { max-width: 900px; margin: 24px auto; padding: 0 24px; }
+  h1 { font-size: 24px; }
+  .actions { display: flex; gap: 8px; margin-bottom: 16px; }
+  .btn { padding: 8px 16px; border: none; border-radius: 4px; cursor: pointer; font-size: 14px; }
+  .btn-add { background: #1a1a2e; color: #fff; }
+  .btn-add:hover { background: #16213e; }
+  .btn-del { background: #d32f2f; color: #fff; font-size: 12px; padding: 4px 10px; }
+  .btn-del:hover { background: #b71c1c; }
+  .btn-sm { font-size: 12px; padding: 4px 10px; background: #1a1a2e; color: #fff; }
+  .btn-sm:hover { background: #16213e; }
+  .group-card { background: #fff; border-radius: 8px; padding: 16px; margin-bottom: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+  .group-header { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
+  .group-name { font-weight: bold; font-size: 18px; }
+  .member-count { color: #888; font-size: 13px; }
+  .members { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+  .member-tag { display: inline-flex; align-items: center; gap: 4px; background: #e8f5e9; color: #2e7d32; padding: 4px 10px; border-radius: 16px; font-size: 13px; }
+  .member-tag .remove { cursor: pointer; font-weight: bold; margin-left: 2px; }
+  .member-tag .remove:hover { color: #d32f2f; }
+  .empty { color: #888; font-style: italic; }
+</style>
+</head>
+<body>
+<nav>
+  <a href="/ui/users">Users</a>
+  <a href="/ui/groups" class="active">Groups</a>
+  <a href="/ui/logs">Logs</a>
+</nav>
+<div class="container">
+  <h1>Groups</h1>
+  <div class="actions">
+    <button class="btn btn-add" onclick="addGroup()">Add Group</button>
+  </div>
+  <div id="groups"></div>
+</div>
+<script>
+var allUsers = [];
+function load() {
+  Promise.all([
+    fetch('/api/groups').then(r => r.json()),
+    fetch('/api/users').then(r => r.json())
+  ]).then(([groups, users]) => {
+    allUsers = users;
+    const el = document.getElementById('groups');
+    if (!groups || groups.length === 0) {
+      el.innerHTML = '<div class="empty">No groups yet. Click "Add Group" to create one.</div>';
+      return;
+    }
+    Promise.all(groups.map(g =>
+      fetch('/api/groups/' + encodeURIComponent(g.Name) + '/members').then(r => r.json()).then(members => ({group: g, members: members}))
+    )).then(data => {
+      el.innerHTML = data.map(({group, members}) => {
+        const memberTags = members.map(m =>
+          '<span class="member-tag">' + esc(m) + ' <span class="remove" onclick="removeMember(\'' + esc(group.Name) + '\', \'' + esc(m) + '\')">&times;</span></span>'
+        ).join('');
+        const nonMembers = allUsers.filter(u => !members.includes(u.Username));
+        const addBtn = nonMembers.length > 0
+          ? ' <button class="btn btn-sm" onclick="addMember(\'' + esc(group.Name) + '\')">Add Member</button>'
+          : '';
+        return '<div class="group-card">' +
+          '<div class="group-header">' +
+            '<span class="group-name">' + esc(group.Name) + '</span>' +
+            '<span class="member-count">' + members.length + ' member' + (members.length !== 1 ? 's' : '') + '</span>' +
+            addBtn +
+            ' <button class="btn btn-del" onclick="delGroup(\'' + esc(group.Name) + '\')">Delete</button>' +
+          '</div>' +
+          '<div class="members">' + (memberTags || '<span class="empty">No members</span>') + '</div>' +
+        '</div>';
+      }).join('');
+    });
+  });
+}
+function esc(s) { if (!s) return ''; const d = document.createElement('div'); d.textContent = s; return d.innerHTML.replace(/'/g, "&#39;").replace(/"/g, '&quot;'); }
+function addGroup() {
+  const name = prompt('Group name:');
+  if (!name) return;
+  fetch('/api/groups', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({Name: name}) })
+    .then(r => { if (!r.ok) return r.json().then(e => { alert(e.error); throw e; }); return r; })
+    .then(() => load());
+}
+function delGroup(name) {
+  if (!confirm('Delete group "' + name + '"? Members will be removed from this group.')) return;
+  fetch('/api/groups/' + encodeURIComponent(name), { method: 'DELETE' }).then(() => load());
+}
+function addMember(groupName) {
+  fetch('/api/groups/' + encodeURIComponent(groupName) + '/members').then(r => r.json()).then(members => {
+    const nonMembers = allUsers.filter(u => !members.includes(u.Username));
+    if (nonMembers.length === 0) { alert('All users are already in this group.'); return; }
+    const choice = prompt('Add user to "' + groupName + '":\\n\\n' + nonMembers.map((u, i) => (i+1) + '. ' + u.Username).join('\\n') + '\\n\\nEnter number or username:');
+    if (!choice) return;
+    const num = parseInt(choice);
+    const username = (num > 0 && num <= nonMembers.length) ? nonMembers[num-1].Username : choice;
+    fetch('/api/groups/' + encodeURIComponent(groupName) + '/members', {
+      method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({Username: username})
+    }).then(r => { if (!r.ok) return r.json().then(e => { alert(e.error); throw e; }); return r; })
+      .then(() => load());
+  });
+}
+function removeMember(groupName, username) {
+  fetch('/api/groups/' + encodeURIComponent(groupName) + '/members/' + encodeURIComponent(username), { method: 'DELETE' }).then(() => load());
+}
+load();
+</script>
+</body>
+</html>`))
+
 func (p *PageHandlers) UsersPage(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/html")
 	usersTmpl.Execute(w, nil)
+}
+
+func (p *PageHandlers) GroupsPage(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "text/html")
+	groupsTmpl.Execute(w, nil)
 }
 
 func (p *PageHandlers) LogsPage(w http.ResponseWriter, r *http.Request) {

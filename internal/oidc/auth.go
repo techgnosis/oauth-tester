@@ -33,6 +33,7 @@ var loginTmpl = template.Must(template.New("login").Parse(`<!DOCTYPE html>
 <body>
 <nav>
   <a href="/ui/users">Users</a>
+  <a href="/ui/groups">Groups</a>
   <a href="/ui/logs">Logs</a>
 </nav>
 <div class="container">

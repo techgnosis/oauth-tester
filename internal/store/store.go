@@ -14,6 +14,7 @@ import (
 // SCIM operations later.
 type Store interface {
 	UserStore
+	GroupStore
 	AuthCodeStore
 	LogStore
 	Close() error
@@ -26,6 +27,16 @@ type UserStore interface {
 	ListUsers() ([]User, error)
 	UpdateUser(u *User) error
 	DeleteUser(username string) error
+}
+
+type GroupStore interface {
+	CreateGroup(name string) error
+	ListGroups() ([]Group, error)
+	DeleteGroup(name string) error
+	AddUserToGroup(username, groupName string) error
+	RemoveUserFromGroup(username, groupName string) error
+	ListGroupMembers(groupName string) ([]string, error)
+	ListUserGroups(username string) ([]string, error)
 }
 
 type AuthCodeStore interface {
@@ -55,7 +66,12 @@ type User struct {
 	Password string
 	Email    string
 	Name     string
-	Groups   string
+}
+
+type Group struct {
+	ID          int64
+	Name        string
+	MemberCount int
 }
 
 type AuthCode struct {
@@ -97,6 +113,11 @@ func Open(dbPath string) (*SQLiteStore, error) {
 	if _, err := db.Exec("PRAGMA journal_mode=WAL"); err != nil {
 		db.Close()
 		return nil, fmt.Errorf("set WAL mode: %w", err)
+	}
+	// Enable foreign keys for cascade deletes.
+	if _, err := db.Exec("PRAGMA foreign_keys=ON"); err != nil {
+		db.Close()
+		return nil, fmt.Errorf("enable foreign keys: %w", err)
 	}
 
 	s := &SQLiteStore{db: db}
@@ -142,6 +163,15 @@ func (s *SQLiteStore) migrate() error {
 			client_id TEXT NOT NULL DEFAULT '',
 			created_at DATETIME NOT NULL DEFAULT (datetime('now'))
 		)`,
+		`CREATE TABLE IF NOT EXISTS groups (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			name TEXT UNIQUE NOT NULL
+		)`,
+		`CREATE TABLE IF NOT EXISTS user_groups (
+			user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+			group_id INTEGER NOT NULL REFERENCES groups(id) ON DELETE CASCADE,
+			UNIQUE(user_id, group_id)
+		)`,
 	}
 
 	for _, m := range migrations {
@@ -154,7 +184,6 @@ func (s *SQLiteStore) migrate() error {
 	alterMigrations := []string{
 		"ALTER TABLE auth_codes ADD COLUMN nonce TEXT NOT NULL DEFAULT ''",
 		"ALTER TABLE auth_codes ADD COLUMN client_id TEXT NOT NULL DEFAULT ''",
-		"ALTER TABLE users ADD COLUMN groups TEXT NOT NULL DEFAULT ''",
 	}
 	for _, m := range alterMigrations {
 		s.db.Exec(m) // ignore errors (column already exists)
@@ -167,8 +196,8 @@ func (s *SQLiteStore) migrate() error {
 
 func (s *SQLiteStore) CreateUser(u *User) error {
 	res, err := s.db.Exec(
-		"INSERT INTO users (username, password, email, name, groups) VALUES (?, ?, ?, ?, ?)",
-		u.Username, u.Password, u.Email, u.Name, u.Groups,
+		"INSERT INTO users (username, password, email, name) VALUES (?, ?, ?, ?)",
+		u.Username, u.Password, u.Email, u.Name,
 	)
 	if err != nil {
 		return err
@@ -180,9 +209,9 @@ func (s *SQLiteStore) CreateUser(u *User) error {
 func (s *SQLiteStore) GetUser(username string) (*User, error) {
 	u := &User{}
 	err := s.db.QueryRow(
-		"SELECT id, username, password, email, name, groups FROM users WHERE username = ?",
+		"SELECT id, username, password, email, name FROM users WHERE username = ?",
 		username,
-	).Scan(&u.ID, &u.Username, &u.Password, &u.Email, &u.Name, &u.Groups)
+	).Scan(&u.ID, &u.Username, &u.Password, &u.Email, &u.Name)
 	if err != nil {
 		return nil, err
 	}
@@ -192,9 +221,9 @@ func (s *SQLiteStore) GetUser(username string) (*User, error) {
 func (s *SQLiteStore) GetUserByEmail(email string) (*User, error) {
 	u := &User{}
 	err := s.db.QueryRow(
-		"SELECT id, username, password, email, name, groups FROM users WHERE email = ?",
+		"SELECT id, username, password, email, name FROM users WHERE email = ?",
 		email,
-	).Scan(&u.ID, &u.Username, &u.Password, &u.Email, &u.Name, &u.Groups)
+	).Scan(&u.ID, &u.Username, &u.Password, &u.Email, &u.Name)
 	if err != nil {
 		return nil, err
 	}
@@ -202,7 +231,7 @@ func (s *SQLiteStore) GetUserByEmail(email string) (*User, error) {
 }
 
 func (s *SQLiteStore) ListUsers() ([]User, error) {
-	rows, err := s.db.Query("SELECT id, username, password, email, name, groups FROM users ORDER BY id")
+	rows, err := s.db.Query("SELECT id, username, password, email, name FROM users ORDER BY id")
 	if err != nil {
 		return nil, err
 	}
@@ -211,7 +240,7 @@ func (s *SQLiteStore) ListUsers() ([]User, error) {
 	var users []User
 	for rows.Next() {
 		var u User
-		if err := rows.Scan(&u.ID, &u.Username, &u.Password, &u.Email, &u.Name, &u.Groups); err != nil {
+		if err := rows.Scan(&u.ID, &u.Username, &u.Password, &u.Email, &u.Name); err != nil {
 			return nil, err
 		}
 		users = append(users, u)
@@ -221,8 +250,8 @@ func (s *SQLiteStore) ListUsers() ([]User, error) {
 
 func (s *SQLiteStore) UpdateUser(u *User) error {
 	_, err := s.db.Exec(
-		"UPDATE users SET password = ?, email = ?, name = ?, groups = ? WHERE username = ?",
-		u.Password, u.Email, u.Name, u.Groups, u.Username,
+		"UPDATE users SET password = ?, email = ?, name = ? WHERE username = ?",
+		u.Password, u.Email, u.Name, u.Username,
 	)
 	return err
 }
@@ -230,6 +259,105 @@ func (s *SQLiteStore) UpdateUser(u *User) error {
 func (s *SQLiteStore) DeleteUser(username string) error {
 	_, err := s.db.Exec("DELETE FROM users WHERE username = ?", username)
 	return err
+}
+
+// --- Group operations ---
+
+func (s *SQLiteStore) CreateGroup(name string) error {
+	_, err := s.db.Exec("INSERT INTO groups (name) VALUES (?)", name)
+	return err
+}
+
+func (s *SQLiteStore) ListGroups() ([]Group, error) {
+	rows, err := s.db.Query(`
+		SELECT g.id, g.name, COUNT(ug.user_id) as member_count
+		FROM groups g
+		LEFT JOIN user_groups ug ON g.id = ug.group_id
+		GROUP BY g.id, g.name
+		ORDER BY g.name`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var groups []Group
+	for rows.Next() {
+		var g Group
+		if err := rows.Scan(&g.ID, &g.Name, &g.MemberCount); err != nil {
+			return nil, err
+		}
+		groups = append(groups, g)
+	}
+	return groups, rows.Err()
+}
+
+func (s *SQLiteStore) DeleteGroup(name string) error {
+	_, err := s.db.Exec("DELETE FROM groups WHERE name = ?", name)
+	return err
+}
+
+func (s *SQLiteStore) AddUserToGroup(username, groupName string) error {
+	_, err := s.db.Exec(`
+		INSERT INTO user_groups (user_id, group_id)
+		SELECT u.id, g.id FROM users u, groups g
+		WHERE u.username = ? AND g.name = ?`,
+		username, groupName)
+	return err
+}
+
+func (s *SQLiteStore) RemoveUserFromGroup(username, groupName string) error {
+	_, err := s.db.Exec(`
+		DELETE FROM user_groups
+		WHERE user_id = (SELECT id FROM users WHERE username = ?)
+		AND group_id = (SELECT id FROM groups WHERE name = ?)`,
+		username, groupName)
+	return err
+}
+
+func (s *SQLiteStore) ListGroupMembers(groupName string) ([]string, error) {
+	rows, err := s.db.Query(`
+		SELECT u.username FROM users u
+		JOIN user_groups ug ON u.id = ug.user_id
+		JOIN groups g ON g.id = ug.group_id
+		WHERE g.name = ?
+		ORDER BY u.username`, groupName)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var members []string
+	for rows.Next() {
+		var username string
+		if err := rows.Scan(&username); err != nil {
+			return nil, err
+		}
+		members = append(members, username)
+	}
+	return members, rows.Err()
+}
+
+func (s *SQLiteStore) ListUserGroups(username string) ([]string, error) {
+	rows, err := s.db.Query(`
+		SELECT g.name FROM groups g
+		JOIN user_groups ug ON g.id = ug.group_id
+		JOIN users u ON u.id = ug.user_id
+		WHERE u.username = ?
+		ORDER BY g.name`, username)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var groups []string
+	for rows.Next() {
+		var name string
+		if err := rows.Scan(&name); err != nil {
+			return nil, err
+		}
+		groups = append(groups, name)
+	}
+	return groups, rows.Err()
 }
 
 // --- Auth code operations ---

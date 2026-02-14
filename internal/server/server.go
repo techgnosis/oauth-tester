@@ -59,6 +59,7 @@ func New(deps *Deps) http.Handler {
 
 	// Web UI pages
 	mux.HandleFunc("GET /ui/users", pageHandlers.UsersPage)
+	mux.HandleFunc("GET /ui/groups", pageHandlers.GroupsPage)
 	mux.HandleFunc("GET /ui/logs", pageHandlers.LogsPage)
 
 	// JSON API - users
@@ -66,6 +67,14 @@ func New(deps *Deps) http.Handler {
 	mux.HandleFunc("POST /api/users", apiHandlers.CreateUser)
 	mux.HandleFunc("PUT /api/users/{username}", apiHandlers.UpdateUser)
 	mux.HandleFunc("DELETE /api/users/{username}", apiHandlers.DeleteUser)
+
+	// JSON API - groups
+	mux.HandleFunc("GET /api/groups", apiHandlers.ListGroups)
+	mux.HandleFunc("POST /api/groups", apiHandlers.CreateGroup)
+	mux.HandleFunc("DELETE /api/groups/{name}", apiHandlers.DeleteGroup)
+	mux.HandleFunc("GET /api/groups/{name}/members", apiHandlers.ListGroupMembers)
+	mux.HandleFunc("POST /api/groups/{name}/members", apiHandlers.AddGroupMember)
+	mux.HandleFunc("DELETE /api/groups/{name}/members/{username}", apiHandlers.RemoveGroupMember)
 
 	// JSON API - logs
 	mux.HandleFunc("GET /api/logs", apiHandlers.ListLogs)
