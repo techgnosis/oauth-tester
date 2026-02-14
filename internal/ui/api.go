@@ -11,10 +11,17 @@ type APIHandlers struct {
 	Store store.Store
 }
 
+// jsonError writes a JSON error response with the given status code.
+func jsonError(w http.ResponseWriter, msg string, code int) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(code)
+	json.NewEncoder(w).Encode(map[string]string{"error": msg})
+}
+
 func (a *APIHandlers) ListUsers(w http.ResponseWriter, r *http.Request) {
 	users, err := a.Store.ListUsers()
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		jsonError(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 	if users == nil {
@@ -27,15 +34,15 @@ func (a *APIHandlers) ListUsers(w http.ResponseWriter, r *http.Request) {
 func (a *APIHandlers) CreateUser(w http.ResponseWriter, r *http.Request) {
 	var u store.User
 	if err := json.NewDecoder(r.Body).Decode(&u); err != nil {
-		http.Error(w, "invalid JSON", http.StatusBadRequest)
+		jsonError(w, "invalid JSON", http.StatusBadRequest)
 		return
 	}
 	if u.Username == "" {
-		http.Error(w, "username is required", http.StatusBadRequest)
+		jsonError(w, "username is required", http.StatusBadRequest)
 		return
 	}
 	if err := a.Store.CreateUser(&u); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		jsonError(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
@@ -47,12 +54,12 @@ func (a *APIHandlers) UpdateUser(w http.ResponseWriter, r *http.Request) {
 	username := r.PathValue("username")
 	var u store.User
 	if err := json.NewDecoder(r.Body).Decode(&u); err != nil {
-		http.Error(w, "invalid JSON", http.StatusBadRequest)
+		jsonError(w, "invalid JSON", http.StatusBadRequest)
 		return
 	}
 	u.Username = username
 	if err := a.Store.UpdateUser(&u); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		jsonError(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
@@ -62,7 +69,7 @@ func (a *APIHandlers) UpdateUser(w http.ResponseWriter, r *http.Request) {
 func (a *APIHandlers) DeleteUser(w http.ResponseWriter, r *http.Request) {
 	username := r.PathValue("username")
 	if err := a.Store.DeleteUser(username); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		jsonError(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)

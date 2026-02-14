@@ -22,7 +22,7 @@ type Deps struct {
 func New(deps *Deps) http.Handler {
 	mux := http.NewServeMux()
 
-	oidcHandlers := &oidc.Handlers{
+	oidcHandlers := &oidc.DiscoveryHandlers{
 		Config: deps.Config,
 		Keys:   deps.Keys,
 	}

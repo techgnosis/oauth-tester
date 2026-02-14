@@ -2,8 +2,8 @@ package oidc
 
 import (
 	"encoding/json"
-	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"oauth-tester/internal/config"
@@ -12,7 +12,7 @@ import (
 
 func TestDiscovery(t *testing.T) {
 	kp, _ := crypto.GenerateKeyPair()
-	h := &Handlers{
+	h := &DiscoveryHandlers{
 		Config: &config.Config{IssuerURL: "https://idp.example.com"},
 		Keys:   kp,
 	}
@@ -47,7 +47,7 @@ func TestDiscovery(t *testing.T) {
 
 func TestJWKSEndpoint(t *testing.T) {
 	kp, _ := crypto.GenerateKeyPair()
-	h := &Handlers{
+	h := &DiscoveryHandlers{
 		Config: &config.Config{IssuerURL: "https://idp.example.com"},
 		Keys:   kp,
 	}
@@ -81,27 +81,14 @@ func TestAuthGetRendersForm(t *testing.T) {
 	}
 
 	body := w.Body.String()
-	if !contains(body, "Login") {
+	if !strings.Contains(body, "Login") {
 		t.Error("response missing Login button")
 	}
-	if !contains(body, "email") {
+	if !strings.Contains(body, "email") {
 		t.Error("response missing email field")
 	}
-	if !contains(body, `value="xyz"`) {
+	if !strings.Contains(body, `value="xyz"`) {
 		t.Error("response missing state hidden field")
 	}
 }
 
-func contains(s, substr string) bool {
-	return len(s) > 0 && len(substr) > 0 && http.DetectContentType([]byte(s)) != "" && // just use strings
-		len(s) >= len(substr) && searchString(s, substr)
-}
-
-func searchString(s, sub string) bool {
-	for i := 0; i <= len(s)-len(sub); i++ {
-		if s[i:i+len(sub)] == sub {
-			return true
-		}
-	}
-	return false
-}

@@ -9,13 +9,13 @@ import (
 	"oauth-tester/internal/crypto"
 )
 
-type Handlers struct {
+type DiscoveryHandlers struct {
 	Config *config.Config
 	Keys   *crypto.KeyPair
 }
 
 // Discovery returns the OpenID Connect discovery document.
-func (h *Handlers) Discovery(w http.ResponseWriter, r *http.Request) {
+func (h *DiscoveryHandlers) Discovery(w http.ResponseWriter, r *http.Request) {
 	issuer := h.Config.IssuerURL
 
 	doc := map[string]any{
@@ -39,7 +39,7 @@ func (h *Handlers) Discovery(w http.ResponseWriter, r *http.Request) {
 }
 
 // JWKS returns the JSON Web Key Set containing the public signing key.
-func (h *Handlers) JWKS(w http.ResponseWriter, r *http.Request) {
+func (h *DiscoveryHandlers) JWKS(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(h.Keys.JWKS())
 }

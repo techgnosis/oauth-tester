@@ -244,15 +244,26 @@ func (s *SQLiteStore) SaveAuthCode(code *AuthCode) error {
 
 // ConsumeAuthCode retrieves and deletes an authorization code atomically.
 func (s *SQLiteStore) ConsumeAuthCode(code string) (*AuthCode, error) {
+	tx, err := s.db.Begin()
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+
 	ac := &AuthCode{}
-	err := s.db.QueryRow(
+	err = tx.QueryRow(
 		"SELECT code, username, redirect_uri, scope, nonce, client_id, created_at FROM auth_codes WHERE code = ?",
 		code,
 	).Scan(&ac.Code, &ac.Username, &ac.RedirectURI, &ac.Scope, &ac.Nonce, &ac.ClientID, &ac.CreatedAt)
 	if err != nil {
 		return nil, err
 	}
-	_, _ = s.db.Exec("DELETE FROM auth_codes WHERE code = ?", code)
+	if _, err := tx.Exec("DELETE FROM auth_codes WHERE code = ?", code); err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
 	return ac, nil
 }
 

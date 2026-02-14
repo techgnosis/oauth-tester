@@ -4,33 +4,16 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"strings"
 	"testing"
 	"time"
 
 	"oauth-tester/internal/store"
+	"oauth-tester/internal/storetest"
 )
 
-func testStore(t *testing.T) store.Store {
-	t.Helper()
-	f, err := os.CreateTemp("", "oauth-tester-test-*.db")
-	if err != nil {
-		t.Fatal(err)
-	}
-	f.Close()
-	t.Cleanup(func() { os.Remove(f.Name()) })
-
-	s, err := store.Open(f.Name())
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { s.Close() })
-	return s
-}
-
 func TestListUsersEmpty(t *testing.T) {
-	s := testStore(t)
+	s := storetest.OpenStore(t)
 	h := &APIHandlers{Store: s}
 
 	req := httptest.NewRequest("GET", "/api/users", nil)
@@ -49,7 +32,7 @@ func TestListUsersEmpty(t *testing.T) {
 }
 
 func TestCreateAndListUsers(t *testing.T) {
-	s := testStore(t)
+	s := storetest.OpenStore(t)
 	h := &APIHandlers{Store: s}
 
 	// Create
@@ -79,7 +62,7 @@ func TestCreateAndListUsers(t *testing.T) {
 }
 
 func TestUpdateUser(t *testing.T) {
-	s := testStore(t)
+	s := storetest.OpenStore(t)
 	h := &APIHandlers{Store: s}
 
 	s.CreateUser(&store.User{Username: "carol", Password: "old"})
@@ -102,7 +85,7 @@ func TestUpdateUser(t *testing.T) {
 }
 
 func TestDeleteUser(t *testing.T) {
-	s := testStore(t)
+	s := storetest.OpenStore(t)
 	h := &APIHandlers{Store: s}
 
 	s.CreateUser(&store.User{Username: "dave", Password: "x"})
@@ -123,7 +106,7 @@ func TestDeleteUser(t *testing.T) {
 }
 
 func TestCreateUserMissingUsername(t *testing.T) {
-	s := testStore(t)
+	s := storetest.OpenStore(t)
 	h := &APIHandlers{Store: s}
 
 	body := `{"Password":"x"}`
@@ -138,7 +121,7 @@ func TestCreateUserMissingUsername(t *testing.T) {
 }
 
 func TestListLogsFiltered(t *testing.T) {
-	s := testStore(t)
+	s := storetest.OpenStore(t)
 	h := &APIHandlers{Store: s}
 
 	now := time.Now().UTC()
@@ -179,7 +162,7 @@ func TestListLogsFiltered(t *testing.T) {
 }
 
 func TestClearLogs(t *testing.T) {
-	s := testStore(t)
+	s := storetest.OpenStore(t)
 	h := &APIHandlers{Store: s}
 
 	s.SaveLog(&store.LogEntry{Timestamp: time.Now().UTC(), Method: "GET", Path: "/auth", ResponseStatus: 200})

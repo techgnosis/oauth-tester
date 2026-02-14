@@ -3,7 +3,6 @@ package oidc
 import (
 	"encoding/json"
 	"net/http/httptest"
-	"os"
 	"strings"
 	"testing"
 	"time"
@@ -11,27 +10,11 @@ import (
 	"oauth-tester/internal/config"
 	"oauth-tester/internal/crypto"
 	"oauth-tester/internal/store"
+	"oauth-tester/internal/storetest"
 )
 
-func testStore(t *testing.T) store.Store {
-	t.Helper()
-	f, err := os.CreateTemp("", "oauth-tester-test-*.db")
-	if err != nil {
-		t.Fatal(err)
-	}
-	f.Close()
-	t.Cleanup(func() { os.Remove(f.Name()) })
-
-	s, err := store.Open(f.Name())
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { s.Close() })
-	return s
-}
-
 func TestTokenEndpoint(t *testing.T) {
-	s := testStore(t)
+	s := storetest.OpenStore(t)
 	kp, _ := crypto.GenerateKeyPair()
 
 	// Create a user and auth code
@@ -84,7 +67,7 @@ func TestTokenEndpoint(t *testing.T) {
 }
 
 func TestTokenEndpointInvalidCode(t *testing.T) {
-	s := testStore(t)
+	s := storetest.OpenStore(t)
 	kp, _ := crypto.GenerateKeyPair()
 
 	th := &TokenHandlers{
@@ -106,7 +89,7 @@ func TestTokenEndpointInvalidCode(t *testing.T) {
 }
 
 func TestTokenEndpointClientSecretValidation(t *testing.T) {
-	s := testStore(t)
+	s := storetest.OpenStore(t)
 	kp, _ := crypto.GenerateKeyPair()
 
 	s.CreateUser(&store.User{Username: "alice", Password: "pass", Email: "alice@test.com", Name: "Alice"})
@@ -157,7 +140,7 @@ func TestTokenEndpointClientSecretValidation(t *testing.T) {
 }
 
 func TestTokenEndpointUnsupportedGrant(t *testing.T) {
-	s := testStore(t)
+	s := storetest.OpenStore(t)
 	kp, _ := crypto.GenerateKeyPair()
 
 	th := &TokenHandlers{
