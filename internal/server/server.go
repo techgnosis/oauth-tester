@@ -35,6 +35,10 @@ func New(deps *Deps) http.Handler {
 		Store: deps.Store,
 		Keys:  deps.Keys,
 	}
+
+	userInfoHandlers := &oidc.UserInfoHandlers{
+		Keys: deps.Keys,
+	}
 	tokenHandlers.Config.IssuerURL = deps.Config.IssuerURL
 	tokenHandlers.Config.ClientID = deps.Config.ClientID
 	tokenHandlers.Config.ClientSecret = deps.Config.ClientSecret
@@ -53,6 +57,7 @@ func New(deps *Deps) http.Handler {
 	mux.HandleFunc("GET /auth", authHandlers.AuthGet)
 	mux.HandleFunc("POST /auth", authHandlers.AuthPost)
 	mux.HandleFunc("POST /token", tokenHandlers.Token)
+	mux.HandleFunc("GET /userinfo", userInfoHandlers.UserInfo)
 
 	// Web UI pages
 	mux.HandleFunc("GET /ui/users", pageHandlers.UsersPage)

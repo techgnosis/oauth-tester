@@ -7,6 +7,7 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"strings"
 	"time"
 )
@@ -62,4 +63,39 @@ func (kp *KeyPair) SignIDToken(claims *Claims) (string, error) {
 
 	sigB64 := base64.RawURLEncoding.EncodeToString(sig)
 	return strings.Join([]string{headerB64, claimsB64, sigB64}, "."), nil
+}
+
+// VerifyIDToken verifies the JWT signature and returns the claims.
+func (kp *KeyPair) VerifyIDToken(token string) (*Claims, error) {
+	parts := strings.Split(token, ".")
+	if len(parts) != 3 {
+		return nil, fmt.Errorf("invalid token format")
+	}
+
+	signingInput := parts[0] + "." + parts[1]
+	sig, err := base64.RawURLEncoding.DecodeString(parts[2])
+	if err != nil {
+		return nil, fmt.Errorf("decode signature: %w", err)
+	}
+
+	hash := sha256.Sum256([]byte(signingInput))
+	if err := rsa.VerifyPKCS1v15(kp.Public, crypto.SHA256, hash[:], sig); err != nil {
+		return nil, fmt.Errorf("invalid signature: %w", err)
+	}
+
+	claimsJSON, err := base64.RawURLEncoding.DecodeString(parts[1])
+	if err != nil {
+		return nil, fmt.Errorf("decode claims: %w", err)
+	}
+
+	var claims Claims
+	if err := json.Unmarshal(claimsJSON, &claims); err != nil {
+		return nil, fmt.Errorf("unmarshal claims: %w", err)
+	}
+
+	if claims.Exp < time.Now().Unix() {
+		return nil, fmt.Errorf("token expired")
+	}
+
+	return &claims, nil
 }

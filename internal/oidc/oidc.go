@@ -22,6 +22,7 @@ func (h *Handlers) Discovery(w http.ResponseWriter, r *http.Request) {
 		"issuer":                                issuer,
 		"authorization_endpoint":                issuer + "/auth",
 		"token_endpoint":                        issuer + "/token",
+		"userinfo_endpoint":                     issuer + "/userinfo",
 		"jwks_uri":                              issuer + "/jwks",
 		"response_types_supported":              []string{"code"},
 		"subject_types_supported":               []string{"public"},

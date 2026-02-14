@@ -17,6 +17,7 @@ var OIDCPaths = []string{
 	"/jwks",
 	"/auth",
 	"/token",
+	"/userinfo",
 }
 
 // LoggingMiddleware captures OIDC request/response pairs to the store.
