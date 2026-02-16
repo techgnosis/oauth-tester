@@ -57,7 +57,15 @@ No more copying tokens into jwt.io. No more scrolling through browser devtools. 
 
 ### Web UI
 
-The same logs are available in a browser at `/ui/logs/oidc` and `/ui/logs/scim` — auto-refreshing every 3 seconds with color-coded status codes, pretty-printed JSON, and inline JWT decoding. A **Clear Logs** button resets between test runs.
+The same logs are available in a browser — auto-refreshing every 3 seconds with color-coded status codes, pretty-printed JSON, and inline JWT decoding. A **Clear Logs** button resets between test runs.
+
+**OIDC logs** (`/ui/logs/oidc`) — discovery, auth, token, and userinfo requests:
+
+![OIDC request logs showing full HTTP traces with decoded JWTs](img/oidc-logs.png)
+
+**SCIM logs** (`/ui/logs/scim`) — every API call made to Houston during a sync:
+
+![SCIM request logs showing PATCH and GET operations against Houston](img/scim-logs.png)
 
 ## Quick start
 
@@ -102,7 +110,13 @@ Supports `client_secret_post` and `client_secret_basic` authentication. JWTs inc
 
 ## User and group management
 
-The web UI at `/ui/users` and `/ui/groups` provides CRUD for users and groups. The same operations are available via JSON API:
+The web UI at `/ui/users` and `/ui/groups` provides CRUD for users and groups.
+
+![User management UI with inline editing](img/users.png)
+
+![Group management UI with member controls](img/groups.png)
+
+The same operations are available via JSON API:
 
 ```
 GET/POST       /api/users
@@ -121,8 +135,10 @@ oauth-tester includes a SCIM 2.0 client that pushes users and groups to Houston'
 ### Setup
 
 1. Configure the Houston URL and SCIM auth code at `/ui/scim` (or `PUT /api/scim/config`)
-2. Click **Push** (or `POST /api/scim/push`) to sync local state to Houston
+2. Click **Push to Houston** (or `POST /api/scim/push`) to sync local state to Houston
 3. The sync is idempotent: creates missing users/groups, updates display names, deactivates removed users, patches group membership
+
+![SCIM configuration page with Houston URL, auth code, and push button](img/scim.png)
 
 ### Authentication
 

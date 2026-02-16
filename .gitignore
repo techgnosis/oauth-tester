@@ -10,3 +10,4 @@ oauth-tester-mac.db-shm
 oauth-tester-mac.db-wal
 *.pem
 houston-api
+.DS_Store
