@@ -10,13 +10,13 @@ import (
 	_ "modernc.org/sqlite"
 )
 
-// Store is the interface for all data access. Designed to be extended with
-// SCIM operations later.
+// Store is the interface for all data access.
 type Store interface {
 	UserStore
 	GroupStore
 	AuthCodeStore
 	LogStore
+	ScimConfigStore
 	Close() error
 }
 
@@ -46,6 +46,7 @@ type AuthCodeStore interface {
 
 // LogQuery specifies filters for listing log entries. Zero values are ignored.
 type LogQuery struct {
+	Source     string // Filter by log source ("oidc" or "scim")
 	Method     string // Filter by HTTP method (e.g. "POST")
 	Path       string // Filter by request path (e.g. "/token")
 	Status     int    // Filter by response status code (e.g. 400)
@@ -58,6 +59,16 @@ type LogStore interface {
 	ListLogs(limit int) ([]LogEntry, error)
 	QueryLogs(q LogQuery) ([]LogEntry, error)
 	ClearLogs() error
+}
+
+type ScimConfig struct {
+	HoustonURL string `json:"houston_url"`
+	AuthCode   string `json:"auth_code"`
+}
+
+type ScimConfigStore interface {
+	GetScimConfig() (*ScimConfig, error)
+	SetScimConfig(cfg *ScimConfig) error
 }
 
 type User struct {
@@ -87,6 +98,7 @@ type AuthCode struct {
 type LogEntry struct {
 	ID              int64
 	Timestamp       time.Time
+	Source          string // "oidc" or "scim"
 	Method          string
 	Path            string
 	Query           string
@@ -149,6 +161,7 @@ func (s *SQLiteStore) migrate() error {
 		`CREATE TABLE IF NOT EXISTS request_log (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
 			timestamp DATETIME NOT NULL DEFAULT (datetime('now')),
+			source TEXT NOT NULL DEFAULT 'oidc',
 			method TEXT NOT NULL,
 			path TEXT NOT NULL,
 			query TEXT NOT NULL DEFAULT '',
@@ -176,6 +189,10 @@ func (s *SQLiteStore) migrate() error {
 			group_id INTEGER NOT NULL REFERENCES groups(id) ON DELETE CASCADE,
 			UNIQUE(user_id, group_id)
 		)`,
+		`CREATE TABLE IF NOT EXISTS scim_config (
+			key TEXT PRIMARY KEY,
+			value TEXT NOT NULL DEFAULT ''
+		)`,
 	}
 
 	for _, m := range migrations {
@@ -188,6 +205,7 @@ func (s *SQLiteStore) migrate() error {
 	alterMigrations := []string{
 		"ALTER TABLE auth_codes ADD COLUMN nonce TEXT NOT NULL DEFAULT ''",
 		"ALTER TABLE auth_codes ADD COLUMN client_id TEXT NOT NULL DEFAULT ''",
+		"ALTER TABLE request_log ADD COLUMN source TEXT NOT NULL DEFAULT 'oidc'",
 	}
 	for _, m := range alterMigrations {
 		s.db.Exec(m) // ignore errors (column already exists)
@@ -402,10 +420,14 @@ func (s *SQLiteStore) ConsumeAuthCode(code string) (*AuthCode, error) {
 // --- Log operations ---
 
 func (s *SQLiteStore) SaveLog(entry *LogEntry) error {
+	source := entry.Source
+	if source == "" {
+		source = "oidc"
+	}
 	_, err := s.db.Exec(
-		`INSERT INTO request_log (timestamp, method, path, query, request_headers, request_body, response_status, response_headers, response_body)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		entry.Timestamp, entry.Method, entry.Path, entry.Query,
+		`INSERT INTO request_log (timestamp, source, method, path, query, request_headers, request_body, response_status, response_headers, response_body)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		entry.Timestamp, source, entry.Method, entry.Path, entry.Query,
 		entry.RequestHeaders, entry.RequestBody,
 		entry.ResponseStatus, entry.ResponseHeaders, entry.ResponseBody,
 	)
@@ -414,7 +436,7 @@ func (s *SQLiteStore) SaveLog(entry *LogEntry) error {
 
 func (s *SQLiteStore) ListLogs(limit int) ([]LogEntry, error) {
 	rows, err := s.db.Query(
-		"SELECT id, timestamp, method, path, query, request_headers, request_body, response_status, response_headers, response_body FROM request_log ORDER BY id DESC LIMIT ?",
+		"SELECT id, timestamp, source, method, path, query, request_headers, request_body, response_status, response_headers, response_body FROM request_log ORDER BY id DESC LIMIT ?",
 		limit,
 	)
 	if err != nil {
@@ -426,7 +448,7 @@ func (s *SQLiteStore) ListLogs(limit int) ([]LogEntry, error) {
 	for rows.Next() {
 		var e LogEntry
 		if err := rows.Scan(
-			&e.ID, &e.Timestamp, &e.Method, &e.Path, &e.Query,
+			&e.ID, &e.Timestamp, &e.Source, &e.Method, &e.Path, &e.Query,
 			&e.RequestHeaders, &e.RequestBody,
 			&e.ResponseStatus, &e.ResponseHeaders, &e.ResponseBody,
 		); err != nil {
@@ -437,10 +459,58 @@ func (s *SQLiteStore) ListLogs(limit int) ([]LogEntry, error) {
 	return logs, rows.Err()
 }
 
+// --- SCIM config operations ---
+
+func (s *SQLiteStore) GetScimConfig() (*ScimConfig, error) {
+	cfg := &ScimConfig{}
+	rows, err := s.db.Query("SELECT key, value FROM scim_config WHERE key IN ('houston_url', 'auth_code')")
+	if err != nil {
+		return cfg, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var k, v string
+		if err := rows.Scan(&k, &v); err != nil {
+			return cfg, err
+		}
+		switch k {
+		case "houston_url":
+			cfg.HoustonURL = v
+		case "auth_code":
+			cfg.AuthCode = v
+		}
+	}
+	return cfg, rows.Err()
+}
+
+func (s *SQLiteStore) SetScimConfig(cfg *ScimConfig) error {
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	for _, kv := range [][2]string{
+		{"houston_url", cfg.HoustonURL},
+		{"auth_code", cfg.AuthCode},
+	} {
+		if _, err := tx.Exec(
+			"INSERT INTO scim_config (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+			kv[0], kv[1],
+		); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
+}
+
 func (s *SQLiteStore) QueryLogs(q LogQuery) ([]LogEntry, error) {
-	query := "SELECT id, timestamp, method, path, query, request_headers, request_body, response_status, response_headers, response_body FROM request_log WHERE 1=1"
+	query := "SELECT id, timestamp, source, method, path, query, request_headers, request_body, response_status, response_headers, response_body FROM request_log WHERE 1=1"
 	var args []any
 
+	if q.Source != "" {
+		query += " AND source = ?"
+		args = append(args, q.Source)
+	}
 	if q.Method != "" {
 		query += " AND method = ?"
 		args = append(args, q.Method)
@@ -475,7 +545,7 @@ func (s *SQLiteStore) QueryLogs(q LogQuery) ([]LogEntry, error) {
 	for rows.Next() {
 		var e LogEntry
 		if err := rows.Scan(
-			&e.ID, &e.Timestamp, &e.Method, &e.Path, &e.Query,
+			&e.ID, &e.Timestamp, &e.Source, &e.Method, &e.Path, &e.Query,
 			&e.RequestHeaders, &e.RequestBody,
 			&e.ResponseStatus, &e.ResponseHeaders, &e.ResponseBody,
 		); err != nil {

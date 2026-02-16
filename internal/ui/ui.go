@@ -45,7 +45,9 @@ var usersTmpl = template.Must(template.New("users").Parse(`<!DOCTYPE html>
 <nav>
   <a href="/ui/users" class="active">Users</a>
   <a href="/ui/groups">Groups</a>
-  <a href="/ui/logs">Logs</a>
+  <a href="/ui/logs/oidc">OIDC Logs</a>
+  <a href="/ui/logs/scim">SCIM Logs</a>
+  <a href="/ui/scim">SCIM</a>
 </nav>
 <div class="container">
   <h1>Users</h1>
@@ -99,10 +101,16 @@ load();
 </body>
 </html>`))
 
+type logsPageData struct {
+	Title      string
+	Source     string
+	EmptyLabel string
+}
+
 var logsTmpl = template.Must(template.New("logs").Parse(`<!DOCTYPE html>
 <html>
 <head>
-<title>Logs - oauth-tester</title>
+<title>{{.Title}} - oauth-tester</title>
 <style>
   body { font-family: system-ui, sans-serif; margin: 0; padding: 0; background: #f5f5f5; }
   nav { background: #1a1a2e; padding: 12px 24px; display: flex; gap: 16px; }
@@ -121,6 +129,9 @@ var logsTmpl = template.Must(template.New("logs").Parse(`<!DOCTYPE html>
   .method { font-weight: bold; padding: 2px 8px; border-radius: 4px; font-size: 13px; }
   .method-GET { background: #e8f5e9; color: #2e7d32; }
   .method-POST { background: #e3f2fd; color: #1565c0; }
+  .method-PUT { background: #fff3e0; color: #e65100; }
+  .method-PATCH { background: #f3e5f5; color: #7b1fa2; }
+  .method-DELETE { background: #ffebee; color: #c62828; }
   .status { font-weight: bold; }
   .status-2xx { color: #2e7d32; }
   .status-3xx { color: #f57f17; }
@@ -137,25 +148,28 @@ var logsTmpl = template.Must(template.New("logs").Parse(`<!DOCTYPE html>
 <nav>
   <a href="/ui/users">Users</a>
   <a href="/ui/groups">Groups</a>
-  <a href="/ui/logs" class="active">Logs</a>
+  <a href="/ui/logs/oidc"{{if eq .Source "oidc"}} class="active"{{end}}>OIDC Logs</a>
+  <a href="/ui/logs/scim"{{if eq .Source "scim"}} class="active"{{end}}>SCIM Logs</a>
+  <a href="/ui/scim">SCIM</a>
 </nav>
 <div class="container">
-  <h1>OIDC Request Logs</h1>
+  <h1>{{.Title}}</h1>
   <div class="actions">
     <button class="btn btn-clear" onclick="clearLogs()">Clear Logs</button>
   </div>
   <div id="logs"></div>
 </div>
 <script>
+var logSource = '{{.Source}}';
 function load() {
-  fetch('/api/logs').then(r => r.json()).then(logs => {
-    const el = document.getElementById('logs');
+  fetch('/api/logs?source=' + logSource).then(r => r.json()).then(logs => {
+    var el = document.getElementById('logs');
     if (!logs || logs.length === 0) {
-      el.innerHTML = '<div class="empty">No OIDC requests logged yet.</div>';
+      el.innerHTML = '<div class="empty">No {{.EmptyLabel}} logged yet.</div>';
       return;
     }
-    el.innerHTML = logs.map(e => {
-      const sc = e.ResponseStatus >= 500 ? '5xx' : e.ResponseStatus >= 400 ? '4xx' : e.ResponseStatus >= 300 ? '3xx' : '2xx';
+    el.innerHTML = logs.map(function(e) {
+      var sc = e.ResponseStatus >= 500 ? '5xx' : e.ResponseStatus >= 400 ? '4xx' : e.ResponseStatus >= 300 ? '3xx' : '2xx';
       return '<div class="log-entry">' +
         '<div class="log-header">' +
           '<span class="method method-' + esc(e.Method) + '">' + esc(e.Method) + '</span>' +
@@ -164,18 +178,18 @@ function load() {
           '<span class="timestamp">' + esc(e.Timestamp) + '</span>' +
         '</div>' +
         (e.RequestHeaders ? '<div class="section"><div class="section-title">Request Headers</div><pre>' + esc(e.RequestHeaders) + '</pre></div>' : '') +
-        (e.RequestBody ? '<div class="section"><div class="section-title">Request Body</div><pre>' + esc(e.RequestBody) + '</pre></div>' : '') +
+        (e.RequestBody ? '<div class="section"><div class="section-title">Request Body</div><pre>' + esc(prettyJSON(e.RequestBody)) + '</pre></div>' : '') +
         (e.ResponseHeaders ? '<div class="section"><div class="section-title">Response Headers</div><pre>' + esc(e.ResponseHeaders) + '</pre></div>' : '') +
         (e.ResponseBody ? '<div class="section"><div class="section-title">Response Body</div><pre>' + esc(prettyJSON(e.ResponseBody)) + '</pre></div>' : '') +
       '</div>';
     }).join('');
   });
 }
-function esc(s) { if (!s) return ''; const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+function esc(s) { if (!s) return ''; var d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
 function prettyJSON(s) { try { return JSON.stringify(JSON.parse(s), null, 2); } catch(e) { return s; } }
 function clearLogs() {
   if (!confirm('Clear all logs?')) return;
-  fetch('/api/logs', { method: 'DELETE' }).then(() => load());
+  fetch('/api/logs', { method: 'DELETE' }).then(function() { load(); });
 }
 load();
 setInterval(load, 3000);
@@ -218,7 +232,9 @@ var groupsTmpl = template.Must(template.New("groups").Parse(`<!DOCTYPE html>
 <nav>
   <a href="/ui/users">Users</a>
   <a href="/ui/groups" class="active">Groups</a>
-  <a href="/ui/logs">Logs</a>
+  <a href="/ui/logs/oidc">OIDC Logs</a>
+  <a href="/ui/logs/scim">SCIM Logs</a>
+  <a href="/ui/scim">SCIM</a>
 </nav>
 <div class="container">
   <h1>Groups</h1>
@@ -298,6 +314,135 @@ load();
 </body>
 </html>`))
 
+var scimTmpl = template.Must(template.New("scim").Parse(`<!DOCTYPE html>
+<html>
+<head>
+<title>SCIM - oauth-tester</title>
+<style>
+  body { font-family: system-ui, sans-serif; margin: 0; padding: 0; background: #f5f5f5; }
+  nav { background: #1a1a2e; padding: 12px 24px; display: flex; gap: 16px; }
+  nav a { color: #e0e0e0; text-decoration: none; font-size: 14px; }
+  nav a:hover { color: #fff; }
+  nav a.active { color: #fff; font-weight: bold; }
+  .container { max-width: 700px; margin: 24px auto; padding: 0 24px; }
+  h1 { font-size: 24px; }
+  .card { background: #fff; border-radius: 8px; padding: 20px; margin-bottom: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+  .card h2 { margin-top: 0; font-size: 16px; color: #333; }
+  label { display: block; font-size: 13px; font-weight: bold; color: #666; margin-bottom: 4px; text-transform: uppercase; }
+  input[type=text], input[type=password] { width: 100%; padding: 8px 10px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px; box-sizing: border-box; margin-bottom: 12px; }
+  input[type=text]:focus, input[type=password]:focus { border-color: #1a1a2e; outline: none; }
+  .btn { padding: 8px 16px; border: none; border-radius: 4px; cursor: pointer; font-size: 14px; }
+  .btn-save { background: #1a1a2e; color: #fff; }
+  .btn-save:hover { background: #16213e; }
+  .btn-push { background: #2e7d32; color: #fff; font-size: 16px; padding: 12px 32px; width: 100%; }
+  .btn-push:hover { background: #1b5e20; }
+  .btn-push:disabled { background: #999; cursor: not-allowed; }
+  .result { margin-top: 16px; }
+  .result-item { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid #eee; font-size: 14px; }
+  .result-label { color: #666; }
+  .result-value { font-weight: bold; }
+  .result-value.created { color: #2e7d32; }
+  .result-value.updated { color: #1565c0; }
+  .result-value.deleted { color: #d32f2f; }
+  .errors { margin-top: 12px; }
+  .error-item { background: #ffebee; color: #c62828; padding: 8px 12px; border-radius: 4px; font-size: 13px; margin-bottom: 4px; }
+  .status-msg { text-align: center; padding: 12px; font-size: 14px; color: #666; }
+  .saved { color: #2e7d32; font-size: 13px; margin-left: 8px; }
+</style>
+</head>
+<body>
+<nav>
+  <a href="/ui/users">Users</a>
+  <a href="/ui/groups">Groups</a>
+  <a href="/ui/logs/oidc">OIDC Logs</a>
+  <a href="/ui/logs/scim">SCIM Logs</a>
+  <a href="/ui/scim" class="active">SCIM</a>
+</nav>
+<div class="container">
+  <h1>SCIM Push to Houston</h1>
+  <div class="card">
+    <h2>Configuration</h2>
+    <label>Houston URL</label>
+    <input type="text" id="houston-url" placeholder="https://houston.example.com">
+    <label>Auth Code</label>
+    <input type="text" id="auth-code" placeholder="SCIM auth code">
+    <button class="btn btn-save" onclick="saveConfig()">Save</button>
+    <span id="save-status"></span>
+  </div>
+  <div class="card">
+    <h2>Push Users &amp; Groups</h2>
+    <p style="font-size:13px;color:#666;margin-top:0;">Syncs all local users and groups to Houston via SCIM. Creates missing users and groups, updates existing ones, deactivates users not found locally, and deletes groups not found locally.</p>
+    <button class="btn btn-push" id="push-btn" onclick="push()">Push to Houston</button>
+    <div id="result"></div>
+  </div>
+</div>
+<script>
+function loadConfig() {
+  fetch('/api/scim/config').then(r => r.json()).then(cfg => {
+    document.getElementById('houston-url').value = cfg.houston_url || '';
+    document.getElementById('auth-code').value = cfg.auth_code || '';
+  });
+}
+function saveConfig() {
+  var cfg = {
+    houston_url: document.getElementById('houston-url').value,
+    auth_code: document.getElementById('auth-code').value
+  };
+  fetch('/api/scim/config', { method: 'PUT', headers: {'Content-Type':'application/json'}, body: JSON.stringify(cfg) })
+    .then(r => {
+      if (r.ok) {
+        var s = document.getElementById('save-status');
+        s.innerHTML = '<span class="saved">Saved</span>';
+        setTimeout(function() { s.innerHTML = ''; }, 2000);
+      }
+    });
+}
+function push() {
+  var btn = document.getElementById('push-btn');
+  var el = document.getElementById('result');
+  btn.disabled = true;
+  btn.textContent = 'Pushing...';
+  el.innerHTML = '<div class="status-msg">Syncing with Houston...</div>';
+  fetch('/api/scim/push', { method: 'POST' })
+    .then(r => r.json())
+    .then(data => {
+      btn.disabled = false;
+      btn.textContent = 'Push to Houston';
+      if (data.error) {
+        el.innerHTML = '<div class="errors"><div class="error-item">' + esc(data.error) + '</div></div>';
+        return;
+      }
+      var html = '<div class="result">';
+      html += item('Users created', data.users_created, 'created');
+      html += item('Users updated', data.users_updated, 'updated');
+      html += item('Users deactivated', data.users_deleted, 'deleted');
+      html += item('Groups created', data.groups_created, 'created');
+      html += item('Groups deleted', data.groups_deleted, 'deleted');
+      html += item('Members added', data.members_added, 'created');
+      html += item('Members removed', data.members_removed, 'deleted');
+      html += '</div>';
+      if (data.errors && data.errors.length > 0) {
+        html += '<div class="errors">';
+        data.errors.forEach(function(e) { html += '<div class="error-item">' + esc(e) + '</div>'; });
+        html += '</div>';
+      }
+      el.innerHTML = html;
+    })
+    .catch(function(err) {
+      btn.disabled = false;
+      btn.textContent = 'Push to Houston';
+      el.innerHTML = '<div class="errors"><div class="error-item">Network error: ' + esc(err.message) + '</div></div>';
+    });
+}
+function item(label, val, cls) {
+  return '<div class="result-item"><span class="result-label">' + label + '</span><span class="result-value ' + cls + '">' + val + '</span></div>';
+}
+function esc(s) { if (!s) return ''; var d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+loadConfig();
+</script>
+</body>
+</html>`))
+
 func (p *PageHandlers) UsersPage(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/html")
 	usersTmpl.Execute(w, nil)
@@ -308,9 +453,27 @@ func (p *PageHandlers) GroupsPage(w http.ResponseWriter, r *http.Request) {
 	groupsTmpl.Execute(w, nil)
 }
 
-func (p *PageHandlers) LogsPage(w http.ResponseWriter, r *http.Request) {
+func (p *PageHandlers) OIDCLogsPage(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/html")
-	logsTmpl.Execute(w, nil)
+	logsTmpl.Execute(w, logsPageData{
+		Title:      "OIDC Request Logs",
+		Source:     "oidc",
+		EmptyLabel: "OIDC requests",
+	})
+}
+
+func (p *PageHandlers) SCIMLogsPage(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "text/html")
+	logsTmpl.Execute(w, logsPageData{
+		Title:      "SCIM Request Logs",
+		Source:     "scim",
+		EmptyLabel: "SCIM requests",
+	})
+}
+
+func (p *PageHandlers) ScimPage(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "text/html")
+	scimTmpl.Execute(w, nil)
 }
 
 // ListLogs returns logs as JSON. Supports query parameters for filtering:
@@ -325,13 +488,14 @@ func (p *PageHandlers) LogsPage(w http.ResponseWriter, r *http.Request) {
 // (returns up to 200 recent entries) for backward compatibility with the UI.
 func (a *APIHandlers) ListLogs(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
-	hasFilters := q.Has("method") || q.Has("path") || q.Has("status") || q.Has("limit") || q.Has("minutes")
+	hasFilters := q.Has("source") || q.Has("method") || q.Has("path") || q.Has("status") || q.Has("limit") || q.Has("minutes")
 
 	var logs []store.LogEntry
 	var err error
 
 	if hasFilters {
 		lq := store.LogQuery{}
+		lq.Source = q.Get("source")
 		lq.Method = strings.ToUpper(q.Get("method"))
 		lq.Path = q.Get("path")
 		if v := q.Get("status"); v != "" {

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"oauth-tester/internal/scim"
 	"oauth-tester/internal/store"
 )
 
@@ -158,4 +159,56 @@ func (a *APIHandlers) RemoveGroupMember(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// --- SCIM config and push endpoints ---
+
+func (a *APIHandlers) GetScimConfig(w http.ResponseWriter, r *http.Request) {
+	cfg, err := a.Store.GetScimConfig()
+	if err != nil {
+		jsonError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(cfg)
+}
+
+func (a *APIHandlers) SetScimConfig(w http.ResponseWriter, r *http.Request) {
+	var cfg store.ScimConfig
+	if err := json.NewDecoder(r.Body).Decode(&cfg); err != nil {
+		jsonError(w, "invalid JSON", http.StatusBadRequest)
+		return
+	}
+	if err := a.Store.SetScimConfig(&cfg); err != nil {
+		jsonError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (a *APIHandlers) ScimPush(w http.ResponseWriter, r *http.Request) {
+	cfg, err := a.Store.GetScimConfig()
+	if err != nil {
+		jsonError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if cfg.HoustonURL == "" {
+		jsonError(w, "SCIM not configured: set Houston URL first", http.StatusBadRequest)
+		return
+	}
+
+	client := &scim.Client{
+		BaseURL:  cfg.HoustonURL,
+		AuthCode: cfg.AuthCode,
+		LogStore: a.Store,
+	}
+
+	result, err := scim.Sync(client, a.Store)
+	if err != nil {
+		jsonError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(result)
 }

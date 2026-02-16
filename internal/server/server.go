@@ -60,7 +60,9 @@ func New(deps *Deps) http.Handler {
 	// Web UI pages
 	mux.HandleFunc("GET /ui/users", pageHandlers.UsersPage)
 	mux.HandleFunc("GET /ui/groups", pageHandlers.GroupsPage)
-	mux.HandleFunc("GET /ui/logs", pageHandlers.LogsPage)
+	mux.HandleFunc("GET /ui/logs/oidc", pageHandlers.OIDCLogsPage)
+	mux.HandleFunc("GET /ui/logs/scim", pageHandlers.SCIMLogsPage)
+	mux.HandleFunc("GET /ui/scim", pageHandlers.ScimPage)
 
 	// JSON API - users
 	mux.HandleFunc("GET /api/users", apiHandlers.ListUsers)
@@ -75,6 +77,11 @@ func New(deps *Deps) http.Handler {
 	mux.HandleFunc("GET /api/groups/{name}/members", apiHandlers.ListGroupMembers)
 	mux.HandleFunc("POST /api/groups/{name}/members", apiHandlers.AddGroupMember)
 	mux.HandleFunc("DELETE /api/groups/{name}/members/{username}", apiHandlers.RemoveGroupMember)
+
+	// JSON API - SCIM
+	mux.HandleFunc("GET /api/scim/config", apiHandlers.GetScimConfig)
+	mux.HandleFunc("PUT /api/scim/config", apiHandlers.SetScimConfig)
+	mux.HandleFunc("POST /api/scim/push", apiHandlers.ScimPush)
 
 	// JSON API - logs
 	mux.HandleFunc("GET /api/logs", apiHandlers.ListLogs)
