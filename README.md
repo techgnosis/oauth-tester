@@ -86,6 +86,31 @@ go build -o oauth-tester .
 
 The server listens on `:443` (TLS required). An RSA-2048 key pair is generated at startup for JWT signing.
 
+### Helm
+
+This is all the APC Helm config that was required
+```
+houston:
+    secret:
+      - envName: "AUTH__OPENID_CONNECT__CUSTOM__CLIENT_SECRET"
+        secretName: "custom-oauth-secret"
+        secretKey: "client_secret"
+      - envName: "SCIM_AUTH_CODE_OKTA"
+        secretName: "okta-provisioning-secret"
+        secretKey: "okta_provisioning_account_secret"
+    config:
+      auth:
+        openidConnect:
+          flow: "code"
+          idpGroupsImportEnabled: true
+          custom:
+            enabled: true
+            discoveryUrl: https://oauth-tester.james-software.astro-cre.com/.well-known/openid-configuration
+            clientId: apc
+            authUrlParams:
+              audience: apc
+```
+
 ### Docker
 
 ```dockerfile
